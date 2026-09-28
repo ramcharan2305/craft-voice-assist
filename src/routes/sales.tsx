@@ -9,9 +9,9 @@ import { useStore } from "@/lib/store";
 export const Route = createFileRoute("/sales")({
   head: () => ({
     meta: [
-      { title: "Your business at a glance — Kalaa Setu" },
+      { title: "Your business at a glance — H Connect" },
       { name: "description", content: "Products listed, products sold, money earned and buyer interest in one simple screen." },
-      { property: "og:title", content: "Your business at a glance — Kalaa Setu" },
+      { property: "og:title", content: "Your business at a glance — H Connect" },
       { property: "og:description", content: "Products listed, products sold, money earned and buyer interest in one simple screen." },
     ],
   }),

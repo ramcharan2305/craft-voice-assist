@@ -10,9 +10,9 @@ import { useStore } from "@/lib/store";
 export const Route = createFileRoute("/home")({
   head: () => ({
     meta: [
-      { title: "Your assistant — Kalaa Setu" },
+      { title: "Your assistant — H Connect" },
       { name: "description", content: "Tap and speak. Your assistant lists products, sets prices and finds buyers." },
-      { property: "og:title", content: "Your assistant — Kalaa Setu" },
+      { property: "og:title", content: "Your assistant — H Connect" },
       { property: "og:description", content: "Tap and speak. Your assistant lists products, sets prices and finds buyers." },
     ],
   }),

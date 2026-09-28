@@ -11,9 +11,9 @@ import { useStore } from "@/lib/store";
 export const Route = createFileRoute("/setup")({
   head: () => ({
     meta: [
-      { title: "Tell us about yourself — Kalaa Setu" },
+      { title: "Tell us about yourself — H Connect" },
       { name: "description", content: "Speak a sentence about your craft and the assistant fills in your profile." },
-      { property: "og:title", content: "Tell us about yourself — Kalaa Setu" },
+      { property: "og:title", content: "Tell us about yourself — H Connect" },
       { property: "og:description", content: "Speak a sentence about your craft and the assistant fills in your profile." },
     ],
   }),

@@ -50,7 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 क
               </span>
               <span>
-                <span className="block font-display text-lg font-semibold">Kalaa Setu</span>
+                <span className="block font-display text-lg font-semibold">H Connect</span>
                 <span className="block text-sm text-ink/55">Your craft assistant</span>
               </span>
             </Link>

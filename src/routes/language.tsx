@@ -7,9 +7,9 @@ import { useStore } from "@/lib/store";
 export const Route = createFileRoute("/language")({
   head: () => ({
     meta: [
-      { title: "Choose your language — Kalaa Setu" },
+      { title: "Choose your language — H Connect" },
       { name: "description", content: "Pick the language you want to speak to your craft assistant in." },
-      { property: "og:title", content: "Choose your language — Kalaa Setu" },
+      { property: "og:title", content: "Choose your language — H Connect" },
       { property: "og:description", content: "Pick the language you want to speak to your craft assistant in." },
     ],
   }),

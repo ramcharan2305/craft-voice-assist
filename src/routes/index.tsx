@@ -6,12 +6,12 @@ import { CraftBackdrop } from "@/components/AppShell";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Kalaa Setu — Your craft. Your market. Your voice." },
+      { title: "H Connect — Your craft. Your market. Your voice." },
       {
         name: "description",
         content: "Sell your handmade products with the help of AI. Just speak, and the assistant does the rest.",
       },
-      { property: "og:title", content: "Kalaa Setu — Your craft. Your market. Your voice." },
+      { property: "og:title", content: "H Connect — Your craft. Your market. Your voice." },
       {
         property: "og:description",
         content: "Sell your handmade products with the help of AI. Just speak, and the assistant does the rest.",
