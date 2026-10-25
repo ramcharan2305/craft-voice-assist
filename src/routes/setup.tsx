@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Check, Mic, Square } from "lucide-react";
 
 import { CraftBackdrop } from "@/components/AppShell";
+import { AuthRedirect } from "@/lib/auth";
 import { Waveform } from "@/components/Waveform";
 import { useSpeech } from "@/hooks/use-speech";
 import { DEMO_ARTISAN } from "@/lib/mock-data";
@@ -11,9 +12,9 @@ import { useStore } from "@/lib/store";
 export const Route = createFileRoute("/setup")({
   head: () => ({
     meta: [
-      { title: "Tell us about yourself — Kalaa Setu" },
+      { title: "Tell us about yourself — H Connect" },
       { name: "description", content: "Speak a sentence about your craft and the assistant fills in your profile." },
-      { property: "og:title", content: "Tell us about yourself — Kalaa Setu" },
+      { property: "og:title", content: "Tell us about yourself — H Connect" },
       { property: "og:description", content: "Speak a sentence about your craft and the assistant fills in your profile." },
     ],
   }),
@@ -31,14 +32,15 @@ function SetupPage() {
   const understood = heard ? artisan : null;
 
   const finish = () => {
-    setArtisan(DEMO_ARTISAN);
+    void setArtisan({ name: artisan.name, craft: DEMO_ARTISAN.craft, location: artisan.location });
     navigate({ to: "/home" });
   };
 
   return (
-    <div className="min-h-screen">
-      <CraftBackdrop />
-      <div className="relative mx-auto max-w-[44rem] px-5 py-12">
+    <AuthRedirect role="merchant">
+      <div className="min-h-screen">
+        <CraftBackdrop />
+        <div className="relative mx-auto max-w-[44rem] px-5 py-12">
         <h1 className="text-3xl">Tell us about yourself.</h1>
         <p className="mt-2 text-base text-ink/60">Just speak one sentence — your name and what you make.</p>
 
@@ -99,7 +101,8 @@ function SetupPage() {
             </button>
           </div>
         ) : null}
+        </div>
       </div>
-    </div>
+    </AuthRedirect>
   );
 }

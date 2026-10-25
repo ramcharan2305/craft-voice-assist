@@ -9,9 +9,9 @@ import { useStore } from "@/lib/store";
 export const Route = createFileRoute("/sales")({
   head: () => ({
     meta: [
-      { title: "Your business at a glance — Kalaa Setu" },
+      { title: "Your business at a glance — H Connect" },
       { name: "description", content: "Products listed, products sold, money earned and buyer interest in one simple screen." },
-      { property: "og:title", content: "Your business at a glance — Kalaa Setu" },
+      { property: "og:title", content: "Your business at a glance — H Connect" },
       { property: "og:description", content: "Products listed, products sold, money earned and buyer interest in one simple screen." },
     ],
   }),
@@ -19,14 +19,14 @@ export const Route = createFileRoute("/sales")({
 });
 
 function SalesPage() {
-  const { products, sales, openAssistant } = useStore();
-  const total = sales.reduce((sum, s) => sum + s.amount, 0);
+  const { products, sales, openAssistant, dashboard, dashboardStatus } = useStore();
+  const total = dashboardStatus === "ready" ? dashboard.totalSales : sales.reduce((sum, s) => sum + s.amount, 0);
   const interest = products.reduce((sum, p) => sum + p.interest, 0);
 
   return (
     <AppShell>
       <h1 className="text-3xl">Your business at a glance.</h1>
-      <p className="mt-2 text-base text-ink/60">Sample figures for the demo.</p>
+      <p className="mt-2 text-base text-ink/60">Counted from your products and orders.</p>
 
       <button
         onClick={openAssistant}
@@ -38,8 +38,8 @@ function SalesPage() {
       <div className="mt-8">
         <SalesSummary
           stats={[
-            { label: "Products listed", value: String(products.filter((p) => p.status === "listed").length) },
-            { label: "Products sold", value: String(sales.length) },
+            { label: "Products listed", value: String(dashboardStatus === "ready" ? dashboard.listedProducts : products.filter((p) => p.status === "listed").length) },
+            { label: "Orders", value: String(dashboardStatus === "ready" ? dashboard.totalOrders : sales.length) },
             { label: "Money earned", value: rupees(total) },
             { label: "Buyers interested", value: String(interest) },
           ]}
@@ -48,19 +48,23 @@ function SalesPage() {
 
       <section className="mt-8">
         <h2 className="text-lg">What you sold</h2>
-        <div className="mt-4 space-y-3">
-          {sales.map((sale) => (
-            <div key={sale.id} className="glass flex items-center justify-between gap-4 p-5">
-              <div>
-                <p className="text-base font-medium">{sale.product}</p>
-                <p className="mt-1 text-sm text-ink/55">
-                  {sale.buyer} · {sale.when}
-                </p>
+        {sales.length === 0 ? (
+          <p className="mt-4 text-base text-ink/60">No orders yet. They will appear here as buyers order your crafts.</p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {sales.map((sale) => (
+              <div key={sale.id} className="glass flex items-center justify-between gap-4 p-5">
+                <div>
+                  <p className="text-base font-medium">{sale.product}</p>
+                  <p className="mt-1 text-sm text-ink/55">
+                    {sale.buyer} · {sale.when}
+                  </p>
+                </div>
+                <p className="font-display text-xl font-semibold text-clay">{rupees(sale.amount)}</p>
               </div>
-              <p className="font-display text-xl font-semibold text-clay">{rupees(sale.amount)}</p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
     </AppShell>
   );

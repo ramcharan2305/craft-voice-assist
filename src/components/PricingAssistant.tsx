@@ -6,19 +6,19 @@ import { useStore } from "@/lib/store";
 
 type Props = {
   suggested: number;
-  cost: number;
   marketLow: number;
   marketHigh: number;
+  priceReason: string;
   onAccept: (price: number) => void;
 };
 
-export function PricingAssistant({ suggested, cost, marketLow, marketHigh, onAccept }: Props) {
+export function PricingAssistant({ suggested, marketLow, marketHigh, priceReason, onAccept }: Props) {
   const { openAssistant } = useStore();
   const [price, setPrice] = useState(suggested);
   const [why, setWhy] = useState(false);
 
-  const min = Math.round(cost * 0.9);
-  const max = Math.round(marketHigh * 1.2);
+  const min = Math.max(50, Math.min(marketLow, suggested));
+  const max = Math.max(min + 50, marketHigh, suggested);
   const position = ((price - min) / (max - min)) * 100;
 
   return (
@@ -30,11 +30,7 @@ export function PricingAssistant({ suggested, cost, marketLow, marketHigh, onAcc
 
       <div className="glass space-y-4 p-5">
         <div className="flex items-baseline justify-between">
-          <span className="text-base text-ink/60">Your cost to make it</span>
-          <span className="font-display text-xl font-semibold">{rupees(cost)}</span>
-        </div>
-        <div className="flex items-baseline justify-between">
-          <span className="text-base text-ink/60">Similar products sell for</span>
+          <span className="text-base text-ink/60">AI-estimated price range</span>
           <span className="font-display text-xl font-semibold">
             {rupees(marketLow)} – {rupees(marketHigh)}
           </span>
@@ -72,9 +68,7 @@ export function PricingAssistant({ suggested, cost, marketLow, marketHigh, onAcc
       {why ? (
         <div className="glass p-5">
           <p className="text-base text-ink/75">
-            Your materials and days of work come to about {rupees(cost)}. Similar handmade pieces sell between{" "}
-            {rupees(marketLow)} and {rupees(marketHigh)}. So {rupees(suggested)} keeps a fair earning for you and still
-            looks reasonable to buyers.
+            {priceReason} This is an estimate, not live market data. Adjust it to account for your materials and time.
           </p>
         </div>
       ) : null}
@@ -91,7 +85,7 @@ export function PricingAssistant({ suggested, cost, marketLow, marketHigh, onAcc
         </button>
         <div className="flex flex-col gap-3 sm:flex-row">
           <button onClick={() => setWhy((v) => !v)} className="chip min-h-14 flex-1 text-base font-medium text-ink">
-            Ask me why
+            Why this price?
           </button>
           <button
             onClick={openAssistant}

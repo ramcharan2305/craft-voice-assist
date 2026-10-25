@@ -3,16 +3,23 @@ import { useState } from "react";
 import { Mic, Plus } from "lucide-react";
 
 import { AppShell } from "@/components/AppShell";
+import { ErrorNotice } from "@/components/ErrorNotice";
 import { ProductCard } from "@/components/ProductCard";
 import { useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/products/")({
   head: () => ({
     meta: [
-      { title: "My products — Kalaa Setu" },
-      { name: "description", content: "Every craft you have listed, with its price and status, in large simple cards." },
-      { property: "og:title", content: "My products — Kalaa Setu" },
-      { property: "og:description", content: "Every craft you have listed, with its price and status, in large simple cards." },
+      { title: "My products — H Connect" },
+      {
+        name: "description",
+        content: "Every craft you have listed, with its price and status, in large simple cards.",
+      },
+      { property: "og:title", content: "My products — H Connect" },
+      {
+        property: "og:description",
+        content: "Every craft you have listed, with its price and status, in large simple cards.",
+      },
     ],
   }),
   component: ProductsPage,
@@ -20,17 +27,30 @@ export const Route = createFileRoute("/products/")({
 
 const FILTERS = [
   { id: "all", label: "All" },
+  { id: "pending", label: "Awaiting approval" },
+  { id: "changes_requested", label: "Corrections requested" },
+  { id: "rejected", label: "Not approved" },
   { id: "listed", label: "In the market" },
   { id: "draft", label: "Not listed" },
   { id: "sold", label: "Sold" },
 ] as const;
 
 function ProductsPage() {
-  const { products, openAssistant } = useStore();
+  const { products, openAssistant, productsStatus, productsError, refreshProducts } = useStore();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
 
-  const visible = filter === "all" ? products : products.filter((p) => p.status === filter);
+  const visible =
+    filter === "all"
+      ? products
+      : ["pending", "changes_requested", "rejected"].includes(filter)
+        ? products.filter((product) => (product.review_status ?? "approved") === filter)
+        : filter === "listed"
+          ? products.filter(
+              (product) =>
+                product.status === "listed" && (product.review_status ?? "approved") === "approved",
+            )
+          : products.filter((product) => product.status === filter);
 
   return (
     <AppShell>
@@ -64,7 +84,19 @@ function ProductsPage() {
         </button>
       </div>
 
-      {visible.length === 0 ? (
+      {productsStatus === "loading" ? (
+        <p className="mt-8 text-base text-ink/60" aria-live="polite">
+          Loading products…
+        </p>
+      ) : productsStatus === "error" ? (
+        <div className="mt-8">
+          <ErrorNotice
+            message={productsError ?? "Unable to load products."}
+            actionLabel="Try again"
+            onAction={() => void refreshProducts()}
+          />
+        </div>
+      ) : visible.length === 0 ? (
         <div className="glass mt-8 p-8 text-center">
           <h2 className="text-xl">Nothing here yet</h2>
           <p className="mt-2 text-base text-ink/60">Speak to me and I'll add your first product.</p>

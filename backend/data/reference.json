@@ -1,0 +1,178 @@
+{
+  "schemes": [
+    [
+      "PMEGP (PM's Employment Generation Programme)",
+      "Credit support for setting up or expanding a micro unit.",
+      "Artisans, SHGs and individual entrepreneurs with a viable project plan.",
+      "Subsidy of 15-35% on project cost plus credit support.",
+      "Apply through kviconline.gov.in or at a Common Service Centre with Aadhaar, PAN and a project report.",
+      "https://www.kviconline.gov.in/pmegpportal/"
+    ],
+    [
+      "Mudra Yojana - Tarun Plus",
+      "Collateral-free loans for small and micro enterprises.",
+      "Any individual, partnership or firm engaged in a non-farm income-generating activity.",
+      "Loan up to 10 lakh rupees with no collateral and a longer repayment period.",
+      "Apply through a bank, NBFC or MUDRA portal with Aadhaar and a business plan.",
+      "https://www.mudra.org.in/"
+    ],
+    [
+      "SME Tailor Made Package for Export",
+      "Support for packaging and branding help for small exporters.",
+      "Registered MSME units making handicraft or textile goods.",
+      "Reimbursement of packaging development and branding costs.",
+      "Apply through the concerned office of the Development Commissioner (Handicrafts) or the portal.",
+      "https://handicrafts.nic.in/"
+    ],
+    [
+      "NHDC Marketing Assistance Scheme",
+      "Help with product photography, catalogues and fair participation.",
+      "Registered craft producers and artisans.",
+      "Subsidy for participation in national and international fairs.",
+      "Register with an empanelled emporium and apply through the NHDC or the office of the Development Commissioner.",
+      "https://handicrafts.nic.in/"
+    ],
+    [
+      "PM Mudra Yojana - Kishor",
+      "Small loans for first-time young entrepreneurs.",
+      "Individuals aged 18-35 starting a new enterprise in manufacturing, trading or services.",
+      "Loan up to 5 lakh rupees.",
+      "Apply at any bank branch with Aadhaar, PAN and a project report.",
+      "https://www.mudra.org.in/"
+    ],
+    [
+      "Stand-Up India - SC/ST and Women Entrepreneurs",
+      "Greenfield manufacturing projects with bank credit.",
+      "SC, ST and women entrepreneurs in manufacturing.",
+      "Bank loan between 10 lakh and 1 crore rupees.",
+      "Apply on the Stand-Up Mitra portal with Aadhaar and a project report.",
+      "https://www.standupmitra.in/"
+    ],
+    [
+      "PM-KUSUM - Component A (Small Solar Power)",
+      "Support for solar pump sets for farmers and rural producers.",
+      "Individual farmers and groups in solar-lit areas.",
+      "Subsidy of 30% and concessional loans for solar equipment.",
+      "Apply at the state renewable energy development agency.",
+      "https://mnre.gov.in/"
+    ],
+    [
+      "National Means-cum-Merit Scholarship",
+      "Scholarship support so the next generation of artisans can study.",
+      "Families of artisans registered with a craft body, with income below the state limit.",
+      "Scholarship of up to 12,000 rupees a year.",
+      "Apply on the National Scholarship Portal with income and category certificates.",
+      "https://scholarships.gov.in/"
+    ],
+    [
+      "One Stop Centre for Entrepreneurs",
+      "Free guidance and registration help for new businesses.",
+      "Any aspiring entrepreneur in a recognised district centre.",
+      "Free advisory, registration help and skill matching.",
+      "Walk into a District Resource Centre or call the state helpline.",
+      "https://www.myscheme.gov.in/schemes/osc"
+    ],
+    [
+      "GeM Artisan Seller Registration",
+      "Sell handicrafts directly to government buyers.",
+      "Any registered artisan or craft cooperative with GST or Udyam registration.",
+      "Direct access to government purchase orders.",
+      "Register on gem.gov.in as a seller with Udyam or GST documents.",
+      "https://gem.gov.in/"
+    ]
+  ],
+  "training": [
+    [
+      "How to Sell Your Crafts Online",
+      "A step-by-step start: photos, prices, shipping and taking payments.",
+      "Online Selling",
+      "Beginner",
+      "English",
+      "https://www.dsource.in/"
+    ],
+    [
+      "Product Photography with a Phone",
+      "Take clear product photos using only a phone and daylight.",
+      "Product Photography",
+      "Beginner",
+      "English",
+      "https://www.dsource.in/"
+    ],
+    [
+      "How to Price Your Handmade Work",
+      "Work out material, labour and margin before you set a price.",
+      "Pricing",
+      "Beginner",
+      "English",
+      "https://www.dsource.in/"
+    ],
+    [
+      "Digital Marketing for Artisans",
+      "Reach buyers using simple posts, messages and local groups.",
+      "Digital Marketing",
+      "Intermediate",
+      "English",
+      "https://www.dsource.in/"
+    ],
+    [
+      "Selling on Government Platforms",
+      "Register and list products on GeM and state emporium portals.",
+      "Online Selling",
+      "Intermediate",
+      "English",
+      "https://gem.gov.in/"
+    ],
+    [
+      "Social Media for Your Craft",
+      "Use WhatsApp and Instagram to show your work and take orders.",
+      "Social Media",
+      "Beginner",
+      "English",
+      "https://www.dsource.in/"
+    ],
+    [
+      "Keeping Simple Business Accounts",
+      "Record what you sold, what you spent and what you earned.",
+      "Financial Literacy",
+      "Beginner",
+      "English",
+      "https://www.dsource.in/"
+    ],
+    [
+      "Writing a Product Description",
+      "Write short, clear descriptions that help buyers understand your craft.",
+      "Digital Marketing",
+      "Beginner",
+      "English",
+      "https://www.dsource.in/"
+    ],
+    [
+      "Packing and Shipping Your Orders",
+      "Pack crafts safely and choose a simple courier partner.",
+      "Online Selling",
+      "Intermediate",
+      "English",
+      "https://www.dsource.in/"
+    ],
+    [
+      "Understanding Craft GST and Udyam",
+      "Know when registration helps and how to complete it.",
+      "Financial Literacy",
+      "Advanced",
+      "English",
+      "https://www.udyamregistration.gov.in/"
+    ]
+  ],
+  "market": [
+    ["Handloom Saree", "Telangana", "High", "₹1,800 – ₹3,500", "Rising", "Demo sample figure"],
+    ["Handloom Saree", "Karnataka", "High", "₹1,600 – ₹3,200", "Stable", "Demo sample figure"],
+    ["Basketry", "Odisha", "Medium", "₹350 – ₹800", "Rising", "Demo sample figure"],
+    ["Terracotta", "Rajasthan", "High", "₹300 – ₹750", "Stable", "Demo sample figure"],
+    ["Wood Carving", "Kerala", "Medium", "₹1,200 – ₹2,400", "Rising", "Demo sample figure"],
+    ["Embroidery", "Gujarat", "High", "₹500 – ₹1,400", "Rising", "Demo sample figure"],
+    ["Silver Jewellery", "Rajasthan", "Medium", "₹1,800 – ₹3,500", "Stable", "Demo sample figure"],
+    ["Natural Dye Fabrics", "Telangana", "Growing", "₹900 – ₹2,200", "Rising", "Demo sample figure"],
+    ["Cane Furniture", "Assam", "Medium", "₹1,500 – ₹3,000", "Stable", "Demo sample figure"],
+    ["Brass Utensils", "Moradabad", "High", "₹700 – ₹1,800", "Rising", "Demo sample figure"]
+  ]
+}

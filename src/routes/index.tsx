@@ -6,12 +6,12 @@ import { CraftBackdrop } from "@/components/AppShell";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Kalaa Setu — Your craft. Your market. Your voice." },
+      { title: "H Connect — Your craft. Your market. Your voice." },
       {
         name: "description",
         content: "Sell your handmade products with the help of AI. Just speak, and the assistant does the rest.",
       },
-      { property: "og:title", content: "Kalaa Setu — Your craft. Your market. Your voice." },
+      { property: "og:title", content: "H Connect — Your craft. Your market. Your voice." },
       {
         property: "og:description",
         content: "Sell your handmade products with the help of AI. Just speak, and the assistant does the rest.",
@@ -43,16 +43,21 @@ function Welcome() {
 
             <div className="mt-8 space-y-3">
               <Link
-                to="/language"
+                to="/login"
                 className="flex min-h-16 items-center justify-center rounded-2xl bg-clay text-lg font-semibold text-white"
               >
-                Start
+                Sign in
               </Link>
-              <Link to="/home" className="chip flex min-h-16 items-center justify-center text-base font-medium text-ink">
-                I already have an account
+              <Link
+                to="/login"
+                className="chip flex min-h-16 items-center justify-center text-base font-medium text-ink"
+              >
+                Continue to your workspace
               </Link>
             </div>
-            <p className="mt-6 text-sm text-ink/50">Demo mode with sample products, buyers and sales.</p>
+            <p className="mt-6 text-sm text-ink/50">
+              Speak or type to list products, set prices and find buyers.
+            </p>
           </div>
         </div>
       </div>

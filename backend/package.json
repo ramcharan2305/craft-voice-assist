@@ -1,0 +1,24 @@
+{
+  "name": "h-connect-backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "H-Connect REST API: Express + Supabase + LLM command parser.",
+  "main": "server.js",
+"scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "db:setup": "node sql/setup.js",
+    "seed": "node seed.js",
+    "seed:accounts": "node seed-accounts.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "pg": "^8.13.1"
+  }
+}

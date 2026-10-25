@@ -1,18 +1,49 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 
-const ACTIONS = ["Cleaned the background", "Improved the lighting", "Straightened the framing", "Sharpened the details"];
+const ACTIONS = ["Lifted the brightness", "Improved contrast", "Balanced the color"];
 
 type Props = {
   before: string;
-  after: string;
-  onUse: () => void;
+  onUse: (image: string) => void;
   onKeepOriginal: () => void;
 };
 
 /** Before / after slider so the artisan can see what changed. */
-export function ImageEnhancer({ before, after, onUse, onKeepOriginal }: Props) {
+export function ImageEnhancer({ before, onUse, onKeepOriginal }: Props) {
   const [split, setSplit] = useState(50);
+  const [enhanced, setEnhanced] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setEnhanced(null);
+    setFailure(null);
+
+    const image = new Image();
+    image.onload = () => {
+      if (!active) return;
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        setFailure("This browser couldn't enhance the photo.");
+        return;
+      }
+      context.filter = "brightness(1.06) contrast(1.1) saturate(1.08)";
+      context.drawImage(image, 0, 0);
+      setEnhanced(canvas.toDataURL("image/jpeg", 0.9));
+    };
+    image.onerror = () => setFailure("This photo couldn't be enhanced. You can keep the original.");
+    image.src = before;
+
+    return () => {
+      active = false;
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [before]);
 
   return (
     <div className="space-y-5">
@@ -26,8 +57,8 @@ export function ImageEnhancer({ before, after, onUse, onKeepOriginal }: Props) {
           <img src={before} alt="Your original photo" className="absolute inset-0 size-full object-cover" />
           <div className="absolute inset-0 overflow-hidden" style={{ width: `${split}%` }}>
             <img
-              src={after}
-              alt="Cleaned product photo"
+              src={enhanced ?? before}
+              alt="Enhanced product photo"
               className="absolute inset-0 h-full w-[100vw] max-w-none object-cover"
               style={{ width: `${(100 / Math.max(split, 1)) * 100}%` }}
             />
@@ -55,20 +86,28 @@ export function ImageEnhancer({ before, after, onUse, onKeepOriginal }: Props) {
           className="mt-5 h-11 w-full accent-clay"
         />
 
-        <ul className="mt-3 space-y-2">
-          {ACTIONS.map((action) => (
-            <li key={action} className="flex items-center gap-3 text-[15px] text-ink/70">
-              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-sage text-white">
-                <Check className="size-4" strokeWidth={3} />
-              </span>
-              {action}
-            </li>
-          ))}
-        </ul>
+        {failure ? <p className="mt-3 text-sm text-destructive" role="status">{failure}</p> : null}
+        {!enhanced && !failure ? <p className="mt-3 text-sm text-ink/60" aria-live="polite">Improving light and color…</p> : null}
+        {enhanced ? (
+          <ul className="mt-3 space-y-2">
+            {ACTIONS.map((action) => (
+              <li key={action} className="flex items-center gap-3 text-[15px] text-ink/70">
+                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-sage text-white">
+                  <Check className="size-4" strokeWidth={3} />
+                </span>
+                {action}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <button onClick={onUse} className="min-h-16 flex-1 rounded-2xl bg-clay text-lg font-semibold text-white">
+        <button
+          disabled={!enhanced}
+          onClick={() => enhanced && onUse(enhanced)}
+          className="min-h-16 flex-1 rounded-2xl bg-clay text-lg font-semibold text-white disabled:opacity-50"
+        >
           Use this image
         </button>
         <button onClick={onKeepOriginal} className="chip min-h-16 flex-1 text-base font-medium text-ink">

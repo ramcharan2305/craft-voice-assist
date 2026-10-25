@@ -10,28 +10,32 @@ import { useStore } from "@/lib/store";
 export const Route = createFileRoute("/home")({
   head: () => ({
     meta: [
-      { title: "Your assistant — Kalaa Setu" },
+      { title: "Your assistant — H Connect" },
       { name: "description", content: "Tap and speak. Your assistant lists products, sets prices and finds buyers." },
-      { property: "og:title", content: "Your assistant — Kalaa Setu" },
+      { property: "og:title", content: "Your assistant — H Connect" },
       { property: "og:description", content: "Tap and speak. Your assistant lists products, sets prices and finds buyers." },
     ],
   }),
   component: HomePage,
 });
 
-const EXAMPLES = [
+type Example = { text: string; to: "/list" | "/buyers" | "/products" | "/sales"; command?: string };
+
+const EXAMPLES: ReadonlyArray<Example> = [
   { text: "List my new product", to: "/list" },
-  { text: "Show my products", to: "/products" },
+  { text: "Show my products", to: "/products", command: "Show my products" },
   { text: "What should I charge?", to: "/list" },
-  { text: "Show my sales", to: "/sales" },
+  { text: "Show my sales", to: "/sales", command: "Show my orders" },
   { text: "Find buyers", to: "/buyers" },
-] as const;
+];
 
 function HomePage() {
-  const { artisan, language, products, openAssistant, sales } = useStore();
+  const { artisan, language, products, openAssistant, openAssistantWith, sales, dashboard, dashboardStatus, productsStatus, productsError } =
+    useStore();
   const navigate = useNavigate();
   const lang = LANGUAGES.find((l) => l.id === language) ?? LANGUAGES[2];
-  const total = sales.reduce((sum, s) => sum + s.amount, 0);
+  const total = dashboardStatus === "ready" ? dashboard.totalSales : sales.reduce((sum, s) => sum + s.amount, 0);
+  const listed = dashboardStatus === "ready" ? dashboard.listedProducts : products.filter((p) => p.status === "listed").length;
 
   return (
     <AppShell>
@@ -60,7 +64,7 @@ function HomePage() {
         {EXAMPLES.map((example) => (
           <button
             key={example.text}
-            onClick={() => navigate({ to: example.to })}
+            onClick={() => (example.command ? openAssistantWith(example.command) : navigate({ to: example.to }))}
             className="chip px-4 py-3 text-[15px] font-medium text-ink"
           >
             {example.text}
@@ -78,9 +82,7 @@ function HomePage() {
         </div>
         <div className="glass p-5">
           <p className="text-sm text-ink/55">Products in the market</p>
-          <p className="mt-1 font-display text-3xl font-semibold">
-            {products.filter((p) => p.status === "listed").length}
-          </p>
+          <p className="mt-1 font-display text-3xl font-semibold">{listed}</p>
           <Link to="/products" className="mt-3 flex items-center gap-1 text-base font-medium text-clay">
             See my products <ChevronRight className="size-4" />
           </Link>
@@ -94,11 +96,24 @@ function HomePage() {
             See all
           </Link>
         </div>
-        <div className="mt-4 grid gap-5 sm:grid-cols-2">
-          {products.slice(0, 2).map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+
+        {productsStatus === "loading" ? (
+          <p className="mt-4 text-base text-ink/60" aria-live="polite">
+            Loading your products…
+          </p>
+        ) : productsStatus === "error" ? (
+          <p className="mt-4 text-base text-destructive">{productsError ?? "Unable to load products."}</p>
+        ) : products.length === 0 ? (
+          <div className="glass mt-4 p-8 text-center">
+            <p className="text-base text-ink/60">No products yet. Say “list my blue cotton saree for 2500 rupees”.</p>
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-5 sm:grid-cols-2">
+            {products.slice(0, 2).map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )}
       </section>
     </AppShell>
   );

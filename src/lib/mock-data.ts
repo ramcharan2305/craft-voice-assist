@@ -6,6 +6,7 @@ import embroideryImg from "@/assets/product-embroidery.jpg";
 import jewelryImg from "@/assets/product-jewelry.jpg";
 
 export type ProductStatus = "listed" | "draft" | "sold";
+export type ProductReviewStatus = "pending" | "approved" | "rejected" | "changes_requested";
 
 export type Product = {
   id: string;
@@ -16,7 +17,12 @@ export type Product = {
   color: string;
   materials: string;
   price: number;
+  quantity: number;
   status: ProductStatus;
+  review_status?: ProductReviewStatus;
+  review_feedback?: string;
+  artisan_name?: string;
+  artisan_location?: string;
   image: string;
   views: number;
   interest: number;
@@ -34,12 +40,7 @@ export type Buyer = {
 };
 
 export type BuyerGroupId =
-  | "retail"
-  | "wholesale"
-  | "business"
-  | "institution"
-  | "government"
-  | "local";
+  "retail" | "wholesale" | "business" | "institution" | "government" | "local";
 
 export type BuyerGroup = {
   id: BuyerGroupId;
@@ -92,6 +93,7 @@ export const DEMO_PRODUCTS: Product[] = [
     color: "Indigo blue",
     materials: "Cotton, zari thread",
     price: 1300,
+    quantity: 4,
     status: "listed",
     image: sareeImg,
     views: 214,
@@ -107,6 +109,7 @@ export const DEMO_PRODUCTS: Product[] = [
     color: "Natural",
     materials: "Bamboo cane",
     price: 450,
+    quantity: 10,
     status: "listed",
     image: basketImg,
     views: 96,
@@ -122,6 +125,7 @@ export const DEMO_PRODUCTS: Product[] = [
     color: "Earth red",
     materials: "River clay",
     price: 620,
+    quantity: 0,
     status: "sold",
     image: potteryImg,
     views: 143,
@@ -137,6 +141,7 @@ export const DEMO_PRODUCTS: Product[] = [
     color: "Warm brown",
     materials: "Teak wood",
     price: 1850,
+    quantity: 2,
     status: "listed",
     image: woodImg,
     views: 78,
@@ -152,6 +157,7 @@ export const DEMO_PRODUCTS: Product[] = [
     color: "Cream, multicolour",
     materials: "Cotton, mirror, silk thread",
     price: 700,
+    quantity: 6,
     status: "draft",
     image: embroideryImg,
     views: 0,
@@ -167,6 +173,7 @@ export const DEMO_PRODUCTS: Product[] = [
     color: "Oxidised silver",
     materials: "Silver alloy",
     price: 2400,
+    quantity: 3,
     status: "listed",
     image: jewelryImg,
     views: 187,
@@ -180,7 +187,12 @@ export const BUYER_GROUPS: BuyerGroup[] = [
   { id: "wholesale", title: "Wholesalers", note: "Large repeat orders", matches: 7 },
   { id: "business", title: "Businesses", note: "Gifting and corporate orders", matches: 5 },
   { id: "institution", title: "Institutional buyers", note: "Hotels, museums, stores", matches: 4 },
-  { id: "government", title: "Government opportunities", note: "Emporium and fair listings", matches: 3 },
+  {
+    id: "government",
+    title: "Government opportunities",
+    note: "Emporium and fair listings",
+    matches: 3,
+  },
   { id: "local", title: "Local stores", note: "Buyers near you", matches: 9 },
 ];
 
@@ -242,10 +254,34 @@ export const DEMO_BUYERS: Buyer[] = [
 ];
 
 export const DEMO_SALES: Sale[] = [
-  { id: "s1", product: "Terracotta Water Pot", buyer: "Demo Heritage Hotels", amount: 6200, when: "This week" },
-  { id: "s2", product: "Blue Handloom Saree", buyer: "Demo Handicrafts Store", amount: 9100, when: "Last week" },
-  { id: "s3", product: "Woven Bamboo Basket", buyer: "Demo Local Craft Corner", amount: 4500, when: "This month" },
-  { id: "s4", product: "Silver Tribal Necklace", buyer: "Example Gifting Co.", amount: 4700, when: "This month" },
+  {
+    id: "s1",
+    product: "Terracotta Water Pot",
+    buyer: "Demo Heritage Hotels",
+    amount: 6200,
+    when: "This week",
+  },
+  {
+    id: "s2",
+    product: "Blue Handloom Saree",
+    buyer: "Demo Handicrafts Store",
+    amount: 9100,
+    when: "Last week",
+  },
+  {
+    id: "s3",
+    product: "Woven Bamboo Basket",
+    buyer: "Demo Local Craft Corner",
+    amount: 4500,
+    when: "This month",
+  },
+  {
+    id: "s4",
+    product: "Silver Tribal Necklace",
+    buyer: "Example Gifting Co.",
+    amount: 4700,
+    when: "This month",
+  },
 ];
 
 export const MONTHLY_SALES = [

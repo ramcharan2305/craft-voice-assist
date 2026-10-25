@@ -1,94 +1,216 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Mic, Volume2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, Mic, Volume2, X } from "lucide-react";
 
-import { Waveform } from "@/components/Waveform";
 import { ErrorNotice } from "@/components/ErrorNotice";
+import { Waveform } from "@/components/Waveform";
+import { aiApi, type AiPending } from "@/api/aiApi";
 import { useSpeech } from "@/hooks/use-speech";
-import { INTENT_LABEL, parseIntent, type Intent } from "@/lib/intents";
-import { rupees } from "@/lib/mock-data";
 import { useStore } from "@/lib/store";
 
 const EXAMPLES = [
-  "List my new product",
+  "List my blue cotton saree for 2500 rupees",
   "Show my products",
-  "Change the saree price to 1500",
-  "Find buyers for my baskets",
-  "What have I sold?",
+  "Show my orders",
+  "What government schemes are available?",
+  "Are there any upcoming exhibitions?",
+  "I want to learn how to sell my products online",
 ];
 
-type Phase = "listening" | "heard" | "confirm" | "done" | "failed";
+const STATUS_TEXT: Record<Phase, string> = {
+  listening: "Tap to speak",
+  working: "Understanding…",
+  ask: "I need one more detail",
+  done: "Done",
+  failed: "Something went wrong",
+};
 
+type Phase = "listening" | "working" | "ask" | "done" | "failed";
+
+/**
+ * The single assistant surface for the whole app.
+ *
+ * Voice and text both end up in the same place: `POST /api/ai/command`.
+ * Voice is only a way of producing that text.
+ */
 export function VoiceAssistantSheet() {
-  const { assistantOpen, closeAssistant, language, findProduct, updateProduct, setProductStatus, say } = useStore();
+  const {
+    assistantOpen,
+    closeAssistant,
+    language,
+    assistantSeed,
+    refreshProducts,
+    refreshOrders,
+    refreshProfile,
+    say,
+    draft,
+    patchDraft,
+  } = useStore();
   const speech = useSpeech(language);
   const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>("listening");
-  const [intent, setIntent] = useState<Intent | null>(null);
   const [typed, setTyped] = useState("");
+  const [question, setQuestion] = useState<string | null>(null);
+  const [reply, setReply] = useState<string | null>(null);
+  const [references, setReferences] = useState<Array<{ href: string; label: string }>>([]);
+  const [failure, setFailure] = useState<string | null>(null);
+  const pending = useRef<AiPending | null>(null);
+  const closeTimer = useRef<number | null>(null);
+  const [willNavigate, setWillNavigate] = useState(false);
+
+  useEffect(
+    () => () => {
+      if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!assistantOpen) return;
     setPhase("listening");
-    setIntent(null);
     setTyped("");
+    setQuestion(null);
+    setReply(null);
+    setReferences([]);
+    setFailure(null);
+    setWillNavigate(false);
+    pending.current = null;
     speech.reset();
+
+    // A phrase chosen from a chip on another screen is sent straight away.
+    if (assistantSeed) {
+      void send(assistantSeed);
+      return () => speech.stop();
+    }
+
     speech.start();
     return () => speech.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assistantOpen]);
+  }, [assistantOpen, assistantSeed]);
 
+  // Speech finished on its own: send it straight to the backend.
   useEffect(() => {
-    if (assistantOpen && !speech.listening && speech.transcript && phase === "listening") {
-      setPhase("heard");
-    }
-  }, [assistantOpen, speech.listening, speech.transcript, phase]);
+    if (!assistantOpen || speech.listening || !speech.transcript) return;
+    if (phase !== "listening") return;
+    void send(speech.transcript);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speech.listening, speech.transcript]);
+
+  const send = useCallback(
+    async (text: string) => {
+      const input = text.trim();
+      if (!input) return;
+
+      speech.stop();
+      setPhase("working");
+      setFailure(null);
+
+      try {
+        const imageContext = draft.description
+          ? {
+              name: draft.name,
+              description: draft.description,
+              category: draft.category,
+              craft: draft.craft,
+              material: draft.materials,
+              color: draft.color,
+            }
+          : null;
+        const result = await aiApi.sendCommand(
+          input,
+          pending.current,
+          imageContext ? null : draft.image,
+          imageContext,
+        );
+
+        if (result.needsInput) {
+          pending.current = result.pending ?? null;
+          setTyped("");
+          setQuestion(result.question ?? "Please tell me a little more.");
+          setPhase("ask");
+          speech.speak(result.question ?? "Please tell me a little more.");
+          return;
+        }
+
+        if (result.intent === "CREATE_PRODUCT" && result.draft) {
+          patchDraft({
+            name: result.draft.name,
+            description: result.draft.description,
+            category: result.draft.category,
+            craft: result.draft.craft,
+            materials: result.draft.material,
+            color: result.draft.color,
+            price: result.draft.price,
+            quantity: result.draft.quantity,
+          });
+        }
+
+        pending.current = null;
+        const message = result.message ?? "Done.";
+        setReply(message);
+        const links: Array<{ href: string; label: string }> = [];
+        if (result.data?.products?.length)
+          links.push({ href: "/user", label: "View approved products" });
+        for (const scheme of result.data?.schemes ?? []) {
+          if (/^https?:\/\//i.test(scheme.official_url))
+            links.push({ href: scheme.official_url, label: scheme.name });
+        }
+        for (const item of result.data?.market?.items ?? result.data?.opportunities?.items ?? []) {
+          if (/^https?:\/\//i.test(item.source))
+            links.push({ href: item.source, label: item.product_category });
+        }
+        setReferences(links.slice(0, 5));
+        setPhase("done");
+        speech.speak(result.speak ?? message);
+        say(message);
+
+        if (result.data?.products || result.removedId) void refreshProducts();
+        if (result.data?.orders) void refreshOrders();
+        if (result.intent === "CREATE_PRODUCT") void refreshProfile();
+
+        if (result.navigate) {
+          setWillNavigate(true);
+          closeTimer.current = window.setTimeout(() => {
+            closeAssistant();
+            navigate({ to: result.navigate! });
+          }, 900);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Something went wrong. Try again.";
+        setFailure(message);
+        setPhase("failed");
+        speech.speak("Something went wrong. Please try again.");
+      }
+    },
+    [
+      closeAssistant,
+      draft.category,
+      draft.color,
+      draft.craft,
+      draft.description,
+      draft.image,
+      draft.materials,
+      draft.name,
+      navigate,
+      patchDraft,
+      refreshOrders,
+      refreshProducts,
+      refreshProfile,
+      say,
+      speech,
+    ],
+  );
 
   if (!assistantOpen) return null;
 
   const heardText = speech.transcript || typed;
+  const busy = phase === "working";
 
-  const run = (parsed: Intent) => {
-    if (parsed.name === "UPDATE_PRODUCT" && parsed.price) {
-      const product = findProduct(parsed.target);
-      if (product) {
-        updateProduct(product.id, { price: parsed.price });
-        say(`${product.name} now costs ${rupees(parsed.price)}.`);
-      }
-    }
-    if (parsed.name === "UNLIST_PRODUCT") {
-      const product = findProduct(parsed.target);
-      if (product) {
-        setProductStatus(product.id, "draft");
-        say(`${product.name} is removed from the market.`);
-      }
-    }
-    speech.speak(parsed.reply);
-    setPhase("done");
-    if (parsed.to) navigate({ to: parsed.to });
-    window.setTimeout(closeAssistant, 900);
-  };
-
-  const understand = (text: string) => {
-    const parsed = parseIntent(text);
-    setIntent(parsed);
-    if (parsed.name === "UNKNOWN") {
-      setPhase("failed");
-      return;
-    }
-    if (parsed.needsConfirm) {
-      setPhase("confirm");
-      speech.speak(parsed.reply);
-      return;
-    }
-    run(parsed);
-  };
-
-  const retry = () => {
-    setIntent(null);
-    setTyped("");
-    speech.reset();
+  const listenAgain = () => {
     setPhase("listening");
+    setReply(null);
+    setFailure(null);
+    speech.reset();
     speech.start();
   };
 
@@ -102,61 +224,116 @@ export function VoiceAssistantSheet() {
       >
         <div className="flex items-center justify-between">
           <h2 className="text-xl">Your assistant</h2>
-          <button onClick={closeAssistant} aria-label="Close assistant" className="chip grid size-11 place-items-center">
+          <button
+            onClick={closeAssistant}
+            aria-label="Close assistant"
+            className="chip grid size-11 place-items-center"
+          >
             <X className="size-5" />
           </button>
         </div>
 
-        {phase === "listening" ? (
-          <div className="mt-6 flex flex-col items-center">
-            <div className="relative grid place-items-center">
-              <span className="halo absolute size-32 rounded-full bg-clay/30 blur-xl" />
-              <span className="relative grid size-24 place-items-center rounded-full bg-clay text-white">
+        <div className="mt-6 flex flex-col items-center">
+          <div className="relative grid place-items-center">
+            <span className="halo absolute size-32 rounded-full bg-clay/30 blur-xl" />
+            <span
+              className={`relative grid size-24 place-items-center rounded-full text-white ${
+                phase === "listening"
+                  ? "bg-clay"
+                  : phase === "failed"
+                    ? "bg-destructive"
+                    : "bg-sage"
+              }`}
+              aria-live="polite"
+            >
+              {busy ? (
+                <Loader2 className="size-10 animate-spin" strokeWidth={1.6} />
+              ) : phase === "failed" ? (
+                <X className="size-10" strokeWidth={1.6} />
+              ) : phase === "done" ? (
+                <Volume2 className="size-10" strokeWidth={1.6} />
+              ) : (
                 <Mic className="size-10" strokeWidth={1.6} />
-              </span>
-            </div>
-            <p className="mt-5 font-display text-2xl font-semibold">
-              {speech.supported ? "Listening…" : "Type what you want"}
-            </p>
-            {speech.supported ? <Waveform className="mt-3" /> : null}
-            <p className="mt-3 min-h-7 text-center text-lg text-ink">{speech.transcript}</p>
+              )}
+            </span>
+          </div>
 
+          <p
+            className="mt-5 font-display text-2xl font-semibold"
+            data-state={phase}
+            data-testid="assistant-state"
+          >
+            {STATUS_TEXT[phase]}
+          </p>
+          {phase === "listening" && speech.supported ? <Waveform className="mt-3" /> : null}
+
+          {phase === "ask" && question ? (
+            <p className="mt-3 text-center text-lg text-ink">{question}</p>
+          ) : phase === "listening" ? (
+            <p className="mt-3 min-h-7 text-center text-lg text-ink">{heardText}</p>
+          ) : null}
+
+          {phase === "done" && reply ? (
+            <p className="mt-3 text-center text-xl text-ink">{reply}</p>
+          ) : null}
+          {phase === "done" && references.length ? (
+            <div className="mt-4 flex w-full flex-col gap-2">
+              {references.map((reference) => (
+                <a
+                  key={`${reference.href}-${reference.label}`}
+                  href={reference.href}
+                  target={reference.href.startsWith("/") ? undefined : "_blank"}
+                  rel={reference.href.startsWith("/") ? undefined : "noreferrer"}
+                  className="rounded-xl bg-white/60 px-4 py-3 text-sm font-medium text-clay underline"
+                >
+                  {reference.label}
+                </a>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        {phase === "listening" ? (
+          <div className="mt-4 flex flex-col gap-3">
             {speech.supported ? (
               <button
-                onClick={speech.stop}
-                className="mt-4 min-h-14 w-full rounded-2xl bg-clay px-5 text-base font-semibold text-white"
-              >
-                I'm done speaking
-              </button>
-            ) : (
-              <form
-                className="mt-4 w-full"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (typed.trim()) setPhase("heard");
+                onClick={() => {
+                  speech.stop();
+                  if (speech.transcript.trim()) void send(speech.transcript);
                 }}
+                className="min-h-14 w-full rounded-2xl bg-clay px-5 text-base font-semibold text-white"
               >
-                <input
-                  value={typed}
-                  onChange={(e) => setTyped(e.target.value)}
-                  placeholder="List my new saree"
-                  aria-label="What would you like to do?"
-                  className="min-h-14 w-full rounded-2xl bg-white/70 px-4 text-base text-ink ring-1 ring-black/5 outline-none placeholder:text-ink/40"
-                />
-                <button className="mt-3 min-h-14 w-full rounded-2xl bg-clay text-base font-semibold text-white">
-                  Continue
-                </button>
-              </form>
-            )}
+                I&apos;m done speaking
+              </button>
+            ) : null}
 
-            <div className="mt-5 flex w-full flex-wrap justify-center gap-2">
+            <form
+              className="flex flex-col gap-3 sm:flex-row"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (typed.trim()) void send(typed);
+              }}
+            >
+              <input
+                value={typed}
+                onChange={(event) => setTyped(event.target.value)}
+                placeholder="Or type what you want…"
+                aria-label="What would you like to do?"
+                className="min-h-14 flex-1 rounded-2xl bg-white/70 px-4 text-base text-ink ring-1 ring-black/5 outline-none placeholder:text-ink/40"
+              />
+              <button className="min-h-14 rounded-2xl bg-clay px-6 text-base font-semibold text-white">
+                Send
+              </button>
+            </form>
+
+            <div className="flex w-full flex-wrap justify-center gap-2">
               {EXAMPLES.map((example) => (
                 <button
                   key={example}
                   onClick={() => {
                     speech.stop();
-                    speech.setTranscript(example);
-                    setPhase("heard");
+                    setTyped(example);
+                    void send(example);
                   }}
                   className="chip px-4 py-2.5 text-[15px] font-medium text-ink"
                 >
@@ -167,58 +344,78 @@ export function VoiceAssistantSheet() {
           </div>
         ) : null}
 
-        {phase === "heard" ? (
-          <div className="mt-6">
-            <p className="text-sm font-medium text-ink/55">I heard</p>
-            <p className="mt-2 rounded-2xl bg-paper-2/70 px-4 py-4 text-lg text-ink">“{heardText}”</p>
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+        {phase === "ask" ? (
+          <div className="mt-4 flex flex-col gap-3">
+            {speech.supported ? (
               <button
-                onClick={() => understand(heardText)}
-                className="min-h-14 flex-1 rounded-2xl bg-clay text-base font-semibold text-white"
+                onClick={listenAgain}
+                className="flex min-h-16 w-full items-center justify-center gap-2 rounded-2xl bg-clay text-lg font-semibold text-white"
               >
-                Yes, that's right
+                <Mic className="size-6" /> Speak your answer
               </button>
-              <button onClick={retry} className="chip min-h-14 flex-1 text-base font-medium text-ink">
-                Try again
+            ) : null}
+            <form
+              className="flex flex-col gap-3 sm:flex-row"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (typed.trim()) void send(typed);
+              }}
+            >
+              <input
+                value={typed}
+                onChange={(event) => setTyped(event.target.value)}
+                placeholder="Five"
+                aria-label="Your answer"
+                className="min-h-14 flex-1 rounded-2xl bg-white/70 px-4 text-base text-ink ring-1 ring-black/5 outline-none"
+              />
+              <button className="min-h-14 rounded-2xl bg-clay px-6 text-base font-semibold text-white">
+                Answer
               </button>
-            </div>
-          </div>
-        ) : null}
-
-        {phase === "confirm" && intent ? (
-          <div className="mt-6">
-            <p className="text-sm font-medium text-ink/55">{INTENT_LABEL[intent.name]}</p>
-            <p className="mt-2 text-xl text-ink">{intent.reply}</p>
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-              <button
-                onClick={() => run(intent)}
-                className={`min-h-14 flex-1 rounded-2xl text-base font-semibold text-white ${intent.name === "UNLIST_PRODUCT" ? "bg-destructive" : "bg-clay"}`}
-              >
-                Confirm
-              </button>
-              <button onClick={retry} className="chip min-h-14 flex-1 text-base font-medium text-ink">
-                Change
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {phase === "done" && intent ? (
-          <div className="mt-6 flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-sage/15 text-sage">
-              <Volume2 className="size-5" />
-            </span>
-            <p className="text-xl text-ink">{intent.reply}</p>
+            </form>
+            <button
+              onClick={() => {
+                pending.current = null;
+                setQuestion(null);
+                setTyped("");
+                listenAgain();
+              }}
+              className="chip min-h-14 w-full text-base font-medium text-ink"
+            >
+              Start again
+            </button>
           </div>
         ) : null}
 
         {phase === "failed" ? (
-          <div className="mt-6">
+          <div className="mt-4">
             <ErrorNotice
-              message={speech.error ?? "I couldn't understand that. Please try again."}
-              actionLabel="Speak again"
-              onAction={retry}
+              message={failure ?? "Something went wrong. Try again."}
+              actionLabel="Try again"
+              onAction={listenAgain}
             />
+          </div>
+        ) : null}
+
+        {phase === "done" && !willNavigate ? (
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={() => {
+                closeAssistant();
+                navigate({ to: "/products" });
+              }}
+              className="min-h-14 flex-1 rounded-2xl bg-clay text-base font-semibold text-white"
+            >
+              See my products
+            </button>
+            <button
+              onClick={() => {
+                setTyped("");
+                listenAgain();
+              }}
+              className="chip min-h-14 flex-1 text-base font-medium text-ink"
+            >
+              Say something else
+            </button>
           </div>
         ) : null}
       </div>

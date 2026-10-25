@@ -10,11 +10,22 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as BuyersRouteImport } from './routes/buyers'
+import { Route as HelpRouteImport } from './routes/help'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as LanguageRouteImport } from './routes/language'
+import { Route as ListRouteImport } from './routes/list'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as LogoutRouteImport } from './routes/logout'
+import { Route as MarketRouteImport } from './routes/market'
+import { Route as OrdersRouteImport } from './routes/orders'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as SalesRouteImport } from './routes/sales'
+import { Route as SchemesRouteImport } from './routes/schemes'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as TrainingRouteImport } from './routes/training'
+import { Route as UserRouteImport } from './routes/user'
 import { Route as ProductsIndexRouteImport } from './routes/products.index'
 import { Route as ProductsIdRouteImport } from './routes/products.$id'
 
@@ -23,9 +34,19 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BuyersRoute = BuyersRouteImport.update({
   id: '/buyers',
   path: '/buyers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelpRoute = HelpRouteImport.update({
+  id: '/help',
+  path: '/help',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HomeRoute = HomeRouteImport.update({
@@ -38,14 +59,59 @@ const LanguageRoute = LanguageRouteImport.update({
   path: '/language',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ListRoute = ListRouteImport.update({
+  id: '/list',
+  path: '/list',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LogoutRoute = LogoutRouteImport.update({
+  id: '/logout',
+  path: '/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MarketRoute = MarketRouteImport.update({
+  id: '/market',
+  path: '/market',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrdersRoute = OrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SalesRoute = SalesRouteImport.update({
   id: '/sales',
   path: '/sales',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SchemesRoute = SchemesRouteImport.update({
+  id: '/schemes',
+  path: '/schemes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrainingRoute = TrainingRouteImport.update({
+  id: '/training',
+  path: '/training',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UserRoute = UserRouteImport.update({
+  id: '/user',
+  path: '/user',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProductsIndexRoute = ProductsIndexRouteImport.update({
@@ -61,32 +127,65 @@ const ProductsIdRoute = ProductsIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/buyers': typeof BuyersRoute
+  '/help': typeof HelpRoute
   '/home': typeof HomeRoute
   '/language': typeof LanguageRoute
+  '/list': typeof ListRoute
+  '/login': typeof LoginRoute
+  '/logout': typeof LogoutRoute
+  '/market': typeof MarketRoute
+  '/orders': typeof OrdersRoute
+  '/profile': typeof ProfileRoute
   '/sales': typeof SalesRoute
+  '/schemes': typeof SchemesRoute
   '/setup': typeof SetupRoute
+  '/training': typeof TrainingRoute
+  '/user': typeof UserRoute
   '/products/$id': typeof ProductsIdRoute
   '/products/': typeof ProductsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/buyers': typeof BuyersRoute
+  '/help': typeof HelpRoute
   '/home': typeof HomeRoute
   '/language': typeof LanguageRoute
+  '/list': typeof ListRoute
+  '/login': typeof LoginRoute
+  '/logout': typeof LogoutRoute
+  '/market': typeof MarketRoute
+  '/orders': typeof OrdersRoute
+  '/profile': typeof ProfileRoute
   '/sales': typeof SalesRoute
+  '/schemes': typeof SchemesRoute
   '/setup': typeof SetupRoute
+  '/training': typeof TrainingRoute
+  '/user': typeof UserRoute
   '/products/$id': typeof ProductsIdRoute
   '/products': typeof ProductsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/buyers': typeof BuyersRoute
+  '/help': typeof HelpRoute
   '/home': typeof HomeRoute
   '/language': typeof LanguageRoute
+  '/list': typeof ListRoute
+  '/login': typeof LoginRoute
+  '/logout': typeof LogoutRoute
+  '/market': typeof MarketRoute
+  '/orders': typeof OrdersRoute
+  '/profile': typeof ProfileRoute
   '/sales': typeof SalesRoute
+  '/schemes': typeof SchemesRoute
   '/setup': typeof SetupRoute
+  '/training': typeof TrainingRoute
+  '/user': typeof UserRoute
   '/products/$id': typeof ProductsIdRoute
   '/products/': typeof ProductsIndexRoute
 }
@@ -94,42 +193,86 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/buyers'
+    | '/help'
     | '/home'
     | '/language'
+    | '/list'
+    | '/login'
+    | '/logout'
+    | '/market'
+    | '/orders'
+    | '/profile'
     | '/sales'
+    | '/schemes'
     | '/setup'
+    | '/training'
+    | '/user'
     | '/products/$id'
     | '/products/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/buyers'
+    | '/help'
     | '/home'
     | '/language'
+    | '/list'
+    | '/login'
+    | '/logout'
+    | '/market'
+    | '/orders'
+    | '/profile'
     | '/sales'
+    | '/schemes'
     | '/setup'
+    | '/training'
+    | '/user'
     | '/products/$id'
     | '/products'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/buyers'
+    | '/help'
     | '/home'
     | '/language'
+    | '/list'
+    | '/login'
+    | '/logout'
+    | '/market'
+    | '/orders'
+    | '/profile'
     | '/sales'
+    | '/schemes'
     | '/setup'
+    | '/training'
+    | '/user'
     | '/products/$id'
     | '/products/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   BuyersRoute: typeof BuyersRoute
+  HelpRoute: typeof HelpRoute
   HomeRoute: typeof HomeRoute
   LanguageRoute: typeof LanguageRoute
+  ListRoute: typeof ListRoute
+  LoginRoute: typeof LoginRoute
+  LogoutRoute: typeof LogoutRoute
+  MarketRoute: typeof MarketRoute
+  OrdersRoute: typeof OrdersRoute
+  ProfileRoute: typeof ProfileRoute
   SalesRoute: typeof SalesRoute
+  SchemesRoute: typeof SchemesRoute
   SetupRoute: typeof SetupRoute
+  TrainingRoute: typeof TrainingRoute
+  UserRoute: typeof UserRoute
   ProductsIdRoute: typeof ProductsIdRoute
   ProductsIndexRoute: typeof ProductsIndexRoute
 }
@@ -143,11 +286,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/buyers': {
       id: '/buyers'
       path: '/buyers'
       fullPath: '/buyers'
       preLoaderRoute: typeof BuyersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/help': {
+      id: '/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof HelpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/home': {
@@ -164,6 +321,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LanguageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/list': {
+      id: '/list'
+      path: '/list'
+      fullPath: '/list'
+      preLoaderRoute: typeof ListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/logout': {
+      id: '/logout'
+      path: '/logout'
+      fullPath: '/logout'
+      preLoaderRoute: typeof LogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/market': {
+      id: '/market'
+      path: '/market'
+      fullPath: '/market'
+      preLoaderRoute: typeof MarketRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/orders': {
+      id: '/orders'
+      path: '/orders'
+      fullPath: '/orders'
+      preLoaderRoute: typeof OrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sales': {
       id: '/sales'
       path: '/sales'
@@ -171,11 +370,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SalesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/schemes': {
+      id: '/schemes'
+      path: '/schemes'
+      fullPath: '/schemes'
+      preLoaderRoute: typeof SchemesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/setup': {
       id: '/setup'
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/training': {
+      id: '/training'
+      path: '/training'
+      fullPath: '/training'
+      preLoaderRoute: typeof TrainingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/user': {
+      id: '/user'
+      path: '/user'
+      fullPath: '/user'
+      preLoaderRoute: typeof UserRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/products/': {
@@ -197,11 +417,22 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   BuyersRoute: BuyersRoute,
+  HelpRoute: HelpRoute,
   HomeRoute: HomeRoute,
   LanguageRoute: LanguageRoute,
+  ListRoute: ListRoute,
+  LoginRoute: LoginRoute,
+  LogoutRoute: LogoutRoute,
+  MarketRoute: MarketRoute,
+  OrdersRoute: OrdersRoute,
+  ProfileRoute: ProfileRoute,
   SalesRoute: SalesRoute,
+  SchemesRoute: SchemesRoute,
   SetupRoute: SetupRoute,
+  TrainingRoute: TrainingRoute,
+  UserRoute: UserRoute,
   ProductsIdRoute: ProductsIdRoute,
   ProductsIndexRoute: ProductsIndexRoute,
 }

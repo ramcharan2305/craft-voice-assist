@@ -7,10 +7,10 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
+import { AuthProvider } from "../lib/auth";
 import { AppStoreProvider } from "../lib/store";
 
 function NotFoundComponent() {
@@ -33,10 +33,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
-
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="glass max-w-md p-8 text-center">
@@ -66,12 +62,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Kalaa Setu — Voice-first selling for artisans" },
+      { title: "H Connect — Voice-first selling for artisans" },
       {
         name: "description",
         content: "Speak to an AI assistant to photograph, catalog, price and sell your handmade crafts.",
       },
-      { property: "og:title", content: "Kalaa Setu — Voice-first selling for artisans" },
+      { property: "og:title", content: "H Connect — Voice-first selling for artisans" },
       {
         property: "og:description",
         content: "Speak to an AI assistant to photograph, catalog, price and sell your handmade crafts.",
@@ -87,7 +83,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=DM+Sans:wght@400;500;600;700&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
     ],
   }),
   shellComponent: RootShell,
@@ -115,10 +111,12 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppStoreProvider>
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
-      </AppStoreProvider>
+      <AuthProvider>
+        <AppStoreProvider>
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+        </AppStoreProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
