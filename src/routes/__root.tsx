@@ -21,7 +21,10 @@ function NotFoundComponent() {
         <h2 className="mt-4 text-xl">This page isn't here</h2>
         <p className="mt-2 text-base text-ink/60">Let's take you back to your assistant.</p>
         <div className="mt-6">
-          <Link to="/" className="inline-flex min-h-14 items-center rounded-2xl bg-clay px-6 text-base font-semibold text-white">
+          <Link
+            to="/"
+            className="inline-flex min-h-14 items-center rounded-2xl bg-clay px-6 text-base font-semibold text-white"
+          >
             Go home
           </Link>
         </div>
@@ -48,7 +51,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           >
             Try again
           </button>
-          <a href="/" className="chip flex min-h-14 items-center px-6 text-base font-medium text-ink">
+          <a
+            href="/"
+            className="chip flex min-h-14 items-center px-6 text-base font-medium text-ink"
+          >
             Go home
           </a>
         </div>
@@ -65,12 +71,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "H Connect — Voice-first selling for artisans" },
       {
         name: "description",
-        content: "Speak to an AI assistant to photograph, catalog, price and sell your handmade crafts.",
+        content:
+          "Speak to an AI assistant to photograph, catalog, price and sell your handmade crafts.",
       },
       { property: "og:title", content: "H Connect — Voice-first selling for artisans" },
       {
         property: "og:description",
-        content: "Speak to an AI assistant to photograph, catalog, price and sell your handmade crafts.",
+        content:
+          "Speak to an AI assistant to photograph, catalog, price and sell your handmade crafts.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

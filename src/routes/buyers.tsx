@@ -16,6 +16,11 @@ export const Route = createFileRoute("/buyers")({
         name: "description",
         content: "View and update requests from buyers for your products and services.",
       },
+      { property: "og:title", content: "Buyer enquiries — H Connect" },
+      {
+        property: "og:description",
+        content: "View and update requests from buyers for your products and services.",
+      },
     ],
   }),
   component: BuyersPage,
