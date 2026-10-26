@@ -89,7 +89,6 @@ create table if not exists public.enquiries (
   message text not null default '',
   status text not null default 'new'
          check (status in ('new', 'in_progress', 'responded', 'closed')),
-  admin_feedback text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

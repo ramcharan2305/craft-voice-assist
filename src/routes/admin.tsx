@@ -3,17 +3,16 @@ import { useCallback, useEffect, useState } from "react";
 import {
   BadgeCheck,
   CircleAlert,
-  ClipboardCheck,
   PackageCheck,
   RefreshCw,
   ShieldCheck,
+  Trash2,
   Users,
 } from "lucide-react";
-
 import { adminApi, type AdminArtisan, type AdminSummary, type ReviewAction } from "@/api/adminApi";
-import type { BuyerRequest, BuyerRequestStatus } from "@/api/buyerApi";
 import type { Product } from "@/lib/mock-data";
 import { AppShell } from "@/components/AppShell";
+import { ConfirmationModal } from "@/components/ConfirmationModal";
 import { rupees } from "@/lib/mock-data";
 import { useStore } from "@/lib/store";
 
@@ -21,7 +20,7 @@ export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
       { title: "Admin overview — H Connect" },
-      { name: "description", content: "Review artisans, products, and buyer enquiries." },
+      { name: "description", content: "Verify artisans and review product listings." },
     ],
   }),
   component: AdminPage,
@@ -32,15 +31,6 @@ const EMPTY_SUMMARY: AdminSummary = {
   pendingArtisans: 0,
   approvedProducts: 0,
   pendingProducts: 0,
-  enquiries: 0,
-  openEnquiries: 0,
-};
-
-const REQUEST_STATUS_LABELS: Record<BuyerRequestStatus, string> = {
-  new: "New",
-  in_progress: "In progress",
-  responded: "Responded",
-  closed: "Closed",
 };
 
 function AdminPage() {
@@ -48,8 +38,8 @@ function AdminPage() {
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [artisans, setArtisans] = useState<AdminArtisan[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [enquiries, setEnquiries] = useState<BuyerRequest[]>([]);
   const [feedback, setFeedback] = useState<Record<string, string>>({});
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -58,16 +48,14 @@ function AdminPage() {
     setLoading(true);
     setFailure(null);
     try {
-      const [nextSummary, nextArtisans, nextProducts, nextEnquiries] = await Promise.all([
+      const [nextSummary, nextArtisans, nextProducts] = await Promise.all([
         adminApi.getSummary(),
         adminApi.getArtisans("pending"),
-        adminApi.getProducts("pending"),
-        adminApi.getEnquiries(),
+        adminApi.getProducts(),
       ]);
       setSummary(nextSummary);
       setArtisans(nextArtisans);
       setProducts(nextProducts);
-      setEnquiries(nextEnquiries);
     } catch (error) {
       setFailure(error instanceof Error ? error.message : "Unable to load the admin workspace.");
     } finally {
@@ -119,15 +107,16 @@ function AdminPage() {
     }
   };
 
-  const updateEnquiry = async (enquiry: BuyerRequest, status: BuyerRequestStatus) => {
-    setBusy(enquiry.id);
+  const deleteProduct = async (product: Product) => {
+    setBusy(product.id);
     setFailure(null);
     try {
-      const updated = await adminApi.updateEnquiry(enquiry.id, status, feedback[enquiry.id] ?? "");
-      setEnquiries((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-      say("Enquiry status updated.");
+      await adminApi.deleteProduct(product.id);
+      say(`${product.name} was removed.`);
+      setProductToDelete(null);
+      await refresh();
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : "Unable to update enquiry.");
+      setFailure(error instanceof Error ? error.message : "Unable to remove this product.");
     } finally {
       setBusy(null);
     }
@@ -142,7 +131,8 @@ function AdminPage() {
           </p>
           <h1 className="mt-2 text-4xl">Admin overview</h1>
           <p className="mt-2 max-w-2xl text-base text-ink/60">
-            Review artisan registrations and product listings, and respond to buyer requests.
+            Verify artisan registrations and approve, reject, or request corrections for product
+            listings.
           </p>
         </div>
         <button
@@ -164,8 +154,8 @@ function AdminPage() {
       ) : null}
 
       <section
-        className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
-        aria-label="Live marketplace metrics"
+        className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+        aria-label="Artisan and listing review metrics"
       >
         <MetricCard
           icon={Users}
@@ -178,12 +168,6 @@ function AdminPage() {
           label="Approved listings"
           value={summary.approvedProducts}
           detail={`${summary.pendingProducts} awaiting review`}
-        />
-        <MetricCard
-          icon={ClipboardCheck}
-          label="Buyer enquiries"
-          value={summary.enquiries}
-          detail={`${summary.openEnquiries} open`}
         />
         <MetricCard
           icon={CircleAlert}
@@ -251,11 +235,11 @@ function AdminPage() {
         <SectionHeading
           icon={PackageCheck}
           eyebrow="Marketplace quality"
-          title="Product review queue"
+          title="Product reviews and listings"
           count={products.length}
         />
         {!loading && products.length === 0 ? (
-          <EmptyState>No products are waiting for review.</EmptyState>
+          <EmptyState>No product listings were found.</EmptyState>
         ) : null}
         <div className="mt-4 space-y-3">
           {products.map((product) => (
@@ -276,6 +260,7 @@ function AdminPage() {
                   <p className="mt-1 text-sm text-ink/55">
                     {product.artisan_name || "Artisan"} · {product.category}
                   </p>
+                  <ReviewBadge status={product.review_status ?? "approved"} />
                   <p className="mt-1 text-sm text-ink/55">{product.description}</p>
                   <p className="mt-2 font-semibold text-clay">
                     {rupees(product.price)} · {product.quantity} available
@@ -303,71 +288,31 @@ function AdminPage() {
                   onReject={() => void reviewProduct(product, "reject")}
                   onCorrections={() => void reviewProduct(product, "corrections")}
                 />
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-9" aria-labelledby="enquiry-heading">
-        <SectionHeading
-          icon={ClipboardCheck}
-          eyebrow="Buyer support"
-          title="Buyer enquiries"
-          count={enquiries.length}
-        />
-        {!loading && enquiries.length === 0 ? (
-          <EmptyState>No buyer enquiries have been received yet.</EmptyState>
-        ) : null}
-        <div className="mt-4 space-y-3">
-          {enquiries.map((enquiry) => (
-            <article
-              key={enquiry.id}
-              className="glass grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_14rem] md:items-center md:p-5"
-            >
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold">{enquiry.product_name}</h3>
-                  <span className="rounded-full bg-ink/8 px-2.5 py-1 text-xs text-ink/60">
-                    {enquiry.request_type}
-                  </span>
-                  <span className="rounded-full bg-sage/15 px-2.5 py-1 text-xs text-sage">
-                    {REQUEST_STATUS_LABELS[enquiry.status]}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-ink/55">
-                  {enquiry.buyer_name} → {enquiry.artisan_name || "Artisan"} ·{" "}
-                  {new Date(enquiry.created_at).toLocaleDateString("en-IN")}
-                </p>
-                <p className="mt-2 text-sm text-ink/70">
-                  {enquiry.message ||
-                    `${enquiry.quantity} piece${enquiry.quantity === 1 ? "" : "s"} requested`}
-                </p>
-                {enquiry.admin_feedback ? (
-                  <p className="mt-1 text-sm text-clay">{enquiry.admin_feedback}</p>
-                ) : null}
-              </div>
-              <label className="text-sm font-medium text-ink/70">
-                Update status
-                <select
-                  value={enquiry.status}
-                  disabled={busy === enquiry.id}
-                  onChange={(event) =>
-                    void updateEnquiry(enquiry, event.target.value as BuyerRequestStatus)
-                  }
-                  className="mt-1 min-h-11 w-full rounded-xl border border-ink/10 bg-white/70 px-3 outline-none focus:ring-2 focus:ring-clay/30"
+                <button
+                  type="button"
+                  disabled={busy === product.id}
+                  onClick={() => setProductToDelete(product)}
+                  className="chip mt-2 inline-flex min-h-10 items-center gap-2 px-3 text-sm font-semibold text-destructive disabled:opacity-50"
                 >
-                  {Object.entries(REQUEST_STATUS_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  <Trash2 className="size-4" />
+                  Remove listing
+                </button>
+              </div>
             </article>
           ))}
         </div>
       </section>
+      <ConfirmationModal
+        open={productToDelete !== null}
+        danger
+        title={`Remove ${productToDelete?.name ?? "this listing"}?`}
+        detail="This permanently removes the product from the marketplace. Existing buyer requests and order records will remain, without a product link."
+        confirmLabel={busy === productToDelete?.id ? "Removing…" : "Yes, remove listing"}
+        onConfirm={() => {
+          if (productToDelete) void deleteProduct(productToDelete);
+        }}
+        onCancel={() => setProductToDelete(null)}
+      />
     </AppShell>
   );
 }

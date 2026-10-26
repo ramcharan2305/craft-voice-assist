@@ -77,7 +77,6 @@ export function toEnquiry(row) {
     quantity: Number(row.quantity ?? 1),
     message: row.message ?? "",
     status: row.status ?? "new",
-    admin_feedback: row.admin_feedback ?? "",
     created_at: row.created_at,
     updated_at: row.updated_at,
   };

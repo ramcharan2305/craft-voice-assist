@@ -337,7 +337,7 @@ async function main() {
     `Seeded ${REFERENCE_SCHEMES.length} schemes, ${REFERENCE_TRAINING.length} training resources, ${REFERENCE_MARKET.length} market insights.`,
   );
 
-  for (const artisan of ARTISANS) {
+  for (const artisan of [ARTISANS[0]]) {
     const user = await ensureAuthUser(artisan.email);
     if (!user) {
       console.warn(`Could not create or find the login for ${artisan.email} — skipping.`);
@@ -415,7 +415,7 @@ async function main() {
     );
   }
 
-  console.log(`\nDone. Demo login: ${ARTISANS[0].email} / ${DEMO_PASSWORD}`);
+  console.log(`\nDone. Lakshmi merchant login: ${ARTISANS[0].email} / ${DEMO_PASSWORD}`);
 }
 
 main().catch((error) => {

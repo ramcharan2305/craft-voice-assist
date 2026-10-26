@@ -1,7 +1,6 @@
 import type { Product } from "@/lib/mock-data";
 
 import { apiFetch, qs } from "./client";
-import type { BuyerRequest, BuyerRequestStatus } from "./buyerApi";
 
 export type ReviewStatus = "pending" | "approved" | "rejected" | "changes_requested";
 export type ReviewAction = "approve" | "reject" | "corrections";
@@ -23,8 +22,6 @@ export type AdminSummary = {
   pendingArtisans: number;
   approvedProducts: number;
   pendingProducts: number;
-  enquiries: number;
-  openEnquiries: number;
 };
 
 export const adminApi = {
@@ -42,10 +39,6 @@ export const adminApi = {
       method: "PUT",
       body: JSON.stringify({ action, feedback }),
     }),
-  getEnquiries: () => apiFetch<BuyerRequest[]>("/admin/enquiries"),
-  updateEnquiry: (id: string, status: BuyerRequestStatus, feedback = "") =>
-    apiFetch<BuyerRequest>(`/admin/enquiries/${id}/status`, {
-      method: "PUT",
-      body: JSON.stringify({ status, feedback }),
-    }),
+  deleteProduct: (id: string) =>
+    apiFetch<{ success: boolean; id: string }>(`/admin/products/${id}`, { method: "DELETE" }),
 };

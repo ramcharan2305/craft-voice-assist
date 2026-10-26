@@ -2,7 +2,7 @@ import { Router } from "express";
 
 import { requireSupabase } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
-import { toArtisan, toEnquiry, toProduct } from "../services/mappers.js";
+import { toArtisan, toProduct } from "../services/mappers.js";
 
 const router = Router();
 router.use(requireRole("admin"));
@@ -32,23 +32,13 @@ router.get("/summary", async (_req, res, next) => {
     const supabase = requireSupabase();
     const count = (table, apply = (query) => query) =>
       apply(supabase.from(table).select("id", { count: "exact", head: true }));
-    const [artisans, pendingArtisans, products, pendingProducts, enquiries, openEnquiries] =
-      await Promise.all([
-        count("artisans"),
-        count("artisans", (query) => query.eq("verification_status", "pending")),
-        count("products", (query) => query.eq("review_status", "approved")),
-        count("products", (query) => query.eq("review_status", "pending")),
-        count("enquiries"),
-        count("enquiries", (query) => query.in("status", ["new", "in_progress"])),
-      ]);
-    for (const result of [
-      artisans,
-      pendingArtisans,
-      products,
-      pendingProducts,
-      enquiries,
-      openEnquiries,
-    ]) {
+    const [artisans, pendingArtisans, products, pendingProducts] = await Promise.all([
+      count("artisans"),
+      count("artisans", (query) => query.eq("verification_status", "pending")),
+      count("products", (query) => query.eq("review_status", "approved")),
+      count("products", (query) => query.eq("review_status", "pending")),
+    ]);
+    for (const result of [artisans, pendingArtisans, products, pendingProducts]) {
       if (result.error) throw result.error;
     }
     return res.json({
@@ -56,8 +46,6 @@ router.get("/summary", async (_req, res, next) => {
       pendingArtisans: pendingArtisans.count ?? 0,
       approvedProducts: products.count ?? 0,
       pendingProducts: pendingProducts.count ?? 0,
-      enquiries: enquiries.count ?? 0,
-      openEnquiries: openEnquiries.count ?? 0,
     });
   } catch (error) {
     return next(error);
@@ -141,41 +129,18 @@ router.put("/products/:id/review", async (req, res, next) => {
   }
 });
 
-router.get("/enquiries", async (req, res, next) => {
+router.delete("/products/:id", async (req, res, next) => {
   try {
-    const status = typeof req.query.status === "string" ? req.query.status.trim() : "";
-    const supabase = requireSupabase();
-    let query = supabase
-      .from("enquiries")
-      .select("*, products(name,image_url), artisans(name)")
-      .order("created_at", { ascending: false });
-    if (status) query = query.eq("status", status);
-    const { data, error } = await query;
-    if (error) throw error;
-    return res.json(data.map(toEnquiry));
-  } catch (error) {
-    return next(error);
-  }
-});
-
-router.put("/enquiries/:id/status", async (req, res, next) => {
-  try {
-    const status = typeof req.body?.status === "string" ? req.body.status.trim() : "";
-    const feedback =
-      typeof req.body?.feedback === "string" ? req.body.feedback.trim().slice(0, 1000) : "";
-    if (!["in_progress", "responded", "closed"].includes(status)) {
-      return res.status(400).json({ error: "Choose in progress, responded, or closed." });
-    }
     const supabase = requireSupabase();
     const { data, error } = await supabase
-      .from("enquiries")
-      .update({ status, admin_feedback: feedback, updated_at: new Date().toISOString() })
+      .from("products")
+      .delete()
       .eq("id", req.params.id)
-      .select("*, products(name,image_url), artisans(name)")
+      .select("id")
       .maybeSingle();
     if (error) throw error;
-    if (!data) return res.status(404).json({ error: "That enquiry was not found." });
-    return res.json(toEnquiry(data));
+    if (!data) return res.status(404).json({ error: "That product was not found." });
+    return res.json({ success: true, id: data.id });
   } catch (error) {
     return next(error);
   }

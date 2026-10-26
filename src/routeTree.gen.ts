@@ -26,6 +26,7 @@ import { Route as SchemesRouteImport } from './routes/schemes'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as TrainingRouteImport } from './routes/training'
 import { Route as UserRouteImport } from './routes/user'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ProductsIndexRouteImport } from './routes/products.index'
 import { Route as ProductsIdRouteImport } from './routes/products.$id'
 
@@ -114,6 +115,11 @@ const UserRoute = UserRouteImport.update({
   path: '/user',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductsIndexRoute = ProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
@@ -143,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/training': typeof TrainingRoute
   '/user': typeof UserRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/products/$id': typeof ProductsIdRoute
   '/products/': typeof ProductsIndexRoute
 }
@@ -164,6 +171,7 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/training': typeof TrainingRoute
   '/user': typeof UserRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/products/$id': typeof ProductsIdRoute
   '/products': typeof ProductsIndexRoute
 }
@@ -186,6 +194,7 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/training': typeof TrainingRoute
   '/user': typeof UserRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/products/$id': typeof ProductsIdRoute
   '/products/': typeof ProductsIndexRoute
 }
@@ -209,6 +218,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/training'
     | '/user'
+    | '/auth/callback'
     | '/products/$id'
     | '/products/'
   fileRoutesByTo: FileRoutesByTo
@@ -230,6 +240,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/training'
     | '/user'
+    | '/auth/callback'
     | '/products/$id'
     | '/products'
   id:
@@ -251,6 +262,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/training'
     | '/user'
+    | '/auth/callback'
     | '/products/$id'
     | '/products/'
   fileRoutesById: FileRoutesById
@@ -273,6 +285,7 @@ export interface RootRouteChildren {
   SetupRoute: typeof SetupRoute
   TrainingRoute: typeof TrainingRoute
   UserRoute: typeof UserRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   ProductsIdRoute: typeof ProductsIdRoute
   ProductsIndexRoute: typeof ProductsIndexRoute
 }
@@ -398,6 +411,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/products/': {
       id: '/products/'
       path: '/products'
@@ -433,6 +453,7 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRoute: SetupRoute,
   TrainingRoute: TrainingRoute,
   UserRoute: UserRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   ProductsIdRoute: ProductsIdRoute,
   ProductsIndexRoute: ProductsIndexRoute,
 }

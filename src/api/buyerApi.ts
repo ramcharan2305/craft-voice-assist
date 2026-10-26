@@ -17,7 +17,6 @@ export type BuyerRequest = {
   quantity: number;
   message: string;
   status: BuyerRequestStatus;
-  admin_feedback: string;
   created_at: string;
 };
 

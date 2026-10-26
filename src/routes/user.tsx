@@ -258,9 +258,6 @@ function BuyerPage() {
                     <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-sage/15 px-2.5 py-1 text-xs font-medium text-sage">
                       <Check className="size-3.5" /> {STATUS_LABEL[request.status]}
                     </span>
-                    {request.admin_feedback ? (
-                      <p className="mt-2 text-xs text-clay">{request.admin_feedback}</p>
-                    ) : null}
                   </div>
                 </article>
               ))}
@@ -491,7 +488,8 @@ function BuyerPage() {
                 />
               </label>
               <p className="text-xs text-ink/50">
-                This sends a request to the artisan; it does not take payment.
+                This goes directly to the artisan. Admin only reviews artisan accounts and product
+                listings; no payment is taken here.
               </p>
               <button
                 type="submit"

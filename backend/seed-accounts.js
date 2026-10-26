@@ -4,10 +4,13 @@ import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.SUPABASE_URL;
 const secretKey = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
-const DEMO_PASSWORD = "hconnect123";
-const ACCOUNTS = [
-  { email: "admin@hconnect.app", role: "admin", name: "H Connect Admin" },
-  { email: "buyer@hconnect.app", role: "buyer", name: "Demo Buyer" },
+const ADMIN_ACCOUNT = { email: "admin@hconnect.app", role: "admin", name: "H Connect Admin" };
+const RETIRED_DEMO_EMAILS = [
+  "buyer@hconnect.app",
+  "ravi@hconnect.app",
+  "meera@hconnect.app",
+  "suresh@hconnect.app",
+  "anjali@hconnect.app",
 ];
 
 if (!url || !secretKey) {
@@ -20,7 +23,7 @@ const supabase = createClient(url, secretKey);
 async function ensureAccount({ email, role, name }) {
   const { data: created, error: createError } = await supabase.auth.admin.createUser({
     email,
-    password: DEMO_PASSWORD,
+    password: "hconnect123",
     email_confirm: true,
     app_metadata: { role },
     user_metadata: { name },
@@ -35,21 +38,32 @@ async function ensureAccount({ email, role, name }) {
   });
   if (listError) throw listError;
   const existing = listed.users.find((user) => user.email?.toLowerCase() === email);
-  if (!existing) throw new Error(`Supabase reported ${email} already exists but did not return it.`);
+  if (!existing)
+    throw new Error(`Supabase reported ${email} already exists but did not return it.`);
 
-  const { data: updated, error: updateError } = await supabase.auth.admin.updateUserById(existing.id, {
-    password: DEMO_PASSWORD,
-    app_metadata: { ...existing.app_metadata, role },
-    user_metadata: { ...existing.user_metadata, name },
-    email_confirm: true,
-  });
+  const { data: updated, error: updateError } = await supabase.auth.admin.updateUserById(
+    existing.id,
+    {
+      app_metadata: { ...existing.app_metadata, role },
+      user_metadata: { ...existing.user_metadata, name },
+    },
+  );
   if (updateError) throw updateError;
   return updated.user;
 }
 
-for (const account of ACCOUNTS) {
-  await ensureAccount(account);
-  console.log(`Ready: ${account.role} demo account (${account.email})`);
-}
+await ensureAccount(ADMIN_ACCOUNT);
+console.log(`Ready: admin account (${ADMIN_ACCOUNT.email})`);
 
-console.log(`Demo password for both accounts: ${DEMO_PASSWORD}`);
+const { data: listed, error: listError } = await supabase.auth.admin.listUsers({
+  page: 1,
+  perPage: 1000,
+});
+if (listError) throw listError;
+for (const email of RETIRED_DEMO_EMAILS) {
+  const user = listed.users.find((candidate) => candidate.email?.toLowerCase() === email);
+  if (!user) continue;
+  const { error } = await supabase.auth.admin.deleteUser(user.id);
+  if (error) throw error;
+  console.log(`Removed obsolete demo login (${email}); existing marketplace records are retained.`);
+}

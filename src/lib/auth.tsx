@@ -1,8 +1,17 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useNavigate } from "@tanstack/react-router";
 
-import { authApi, type AuthUser } from "@/api/authApi";
+import { authApi, type AccountRole, type AuthUser } from "@/api/authApi";
 import { ApiError, AUTH_STORAGE_KEY, type StoredAuthSession } from "@/api/client";
+import { googleAuthClient } from "@/lib/supabase";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -11,6 +20,12 @@ type AuthContextValue = {
   session: StoredAuthSession | null;
   user: AuthUser | null;
   login: (email: string, password: string) => Promise<AuthUser>;
+  completeGoogleSignIn: (
+    accessToken: string,
+    refreshToken: string,
+    expiresAt: number | null,
+    role: AccountRole,
+  ) => Promise<AuthUser>;
   logout: () => Promise<void>;
 };
 
@@ -80,6 +95,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [saveSession],
   );
 
+  const completeGoogleSignIn = useCallback(
+    async (
+      accessToken: string,
+      refreshToken: string,
+      expiresAt: number | null,
+      role: AccountRole,
+    ) => {
+      const result = await authApi.completeGoogle(accessToken, role);
+      saveSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        expires_at: expiresAt,
+        user: result.user,
+      });
+      setStatus("authenticated");
+      return result.user;
+    },
+    [saveSession],
+  );
+
   const logout = useCallback(async () => {
     let logoutError: unknown;
     try {
@@ -87,6 +122,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       if (!(error instanceof ApiError && [401, 403].includes(error.status))) logoutError = error;
     } finally {
+      if (googleAuthClient) {
+        const { error } = await googleAuthClient.auth.signOut({ scope: "local" });
+        if (error && !logoutError) logoutError = error;
+      }
       saveSession(null);
       setStatus("unauthenticated");
     }
@@ -94,8 +133,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [saveSession, session?.access_token]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, session, user: session?.user ?? null, login, logout }),
-    [status, session, login, logout],
+    () => ({
+      status,
+      session,
+      user: session?.user ?? null,
+      login,
+      completeGoogleSignIn,
+      logout,
+    }),
+    [status, session, login, completeGoogleSignIn, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

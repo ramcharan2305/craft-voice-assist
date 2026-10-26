@@ -5,12 +5,14 @@ using the existing React, Express, and Supabase stack.
 
 ## Current features
 
+- Google sign-in for new buyers and merchants, with workspace selection at onboarding.
 - Merchant workspace with product creation, editing, inventory, profile, and orders.
 - Voice or typed product descriptions; speech recognition is browser-based and
   the resulting listing remains editable before submission.
 - Product submissions require admin review before appearing in the buyer catalogue.
-- Admin artisan verification, product approve/reject/corrections actions, feedback,
-  buyer enquiry management, and database-backed statistics.
+- Admin artisan verification and product approve/reject/corrections actions,
+  with feedback, database-backed review statistics, and the ability to remove
+  approved or demo listings.
 - Buyer search, category filters, price limits such as “under ₹2,000,” product
   questions, purchase requests, service requests, and persistent request history.
 - Voice/text assistant searches approved products and stored scheme/market records.
@@ -19,24 +21,27 @@ using the existing React, Express, and Supabase stack.
 
 ## Demo accounts
 
-Sign in at `/login`. Local demo accounts use the password `hconnect123`.
+Sign in at `/login`. New buyers and merchants choose a workspace and continue
+with Google. Existing demo accounts use the password `hconnect123`.
 
-| Workspace | Email |
-| --- | --- |
-| Merchant | `lakshmi@hconnect.app` |
-| Buyer | `buyer@hconnect.app` |
-| Admin | `admin@hconnect.app` |
+| Workspace | Email                  |
+| --------- | ---------------------- |
+| Merchant  | `lakshmi@hconnect.app` |
+| Admin     | `admin@hconnect.app`   |
 
-These are demo credentials; rotate them before deployment.
+These are the only demo logins provisioned by the seed scripts. New users create
+their own buyer or merchant account with Google.
+Running `npm run seed:accounts --prefix backend` removes the old demo buyer and
+extra artisan logins while retaining their existing database records.
 
 ## Stack
 
-| Layer | Technology |
-| --- | --- |
-| Frontend | React 19, TanStack Start, Vite, Tailwind CSS v4 |
-| Backend | Node.js, Express 4 |
-| Database and auth | Supabase PostgreSQL and Supabase Auth |
-| Speech | Browser SpeechRecognition and SpeechSynthesis |
+| Layer              | Technology                                                               |
+| ------------------ | ------------------------------------------------------------------------ |
+| Frontend           | React 19, TanStack Start, Vite, Tailwind CSS v4                          |
+| Backend            | Node.js, Express 4                                                       |
+| Database and auth  | Supabase PostgreSQL and Supabase Auth                                    |
+| Speech             | Browser SpeechRecognition and SpeechSynthesis                            |
 | Optional assistant | OpenAI-compatible API; core catalogue search works without a paid AI key |
 
 The browser never receives the Supabase service-role key. The Express API
@@ -68,7 +73,21 @@ are restricted by backend role checks.
    legacy variable names. Never put the secret/service-role key in a frontend
    environment file.
 
-3. Apply the schema and create demo data/accounts:
+3. Configure frontend Google sign-in by copying the root `.env.example` to `.env`:
+
+   ```dotenv
+   VITE_SUPABASE_URL=https://<project>.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-or-anon-key>
+   ```
+
+   In Supabase Authentication, enable Google and provide the Google OAuth
+   client ID and secret. Add
+   `https://<project-ref>.supabase.co/auth/v1/callback` to the Google OAuth
+   client's authorized redirect URIs. Add your app URL and
+   `http://localhost:5173/auth/callback` to Supabase's allowed redirect URLs.
+   Restart Vite after setting these values.
+
+4. Apply the schema and create the retained demo data/accounts:
 
    ```bash
    cd backend
@@ -81,7 +100,7 @@ are restricted by backend role checks.
    schema setup adds product review state, artisan verification state, and
    persistent buyer enquiries to the existing tables.
 
-4. Start the backend and frontend in separate terminals:
+5. Start the backend and frontend in separate terminals:
 
    ```bash
    # Terminal 1, from the repository root
@@ -102,26 +121,36 @@ are restricted by backend role checks.
 3. Sign in as admin, review artisan/product submissions, and approve or provide
    feedback for corrections/rejection.
 4. Sign in as buyer and find approved listings using search, category, or price.
-5. Send a purchase request or question. It appears in buyer request history,
-   the merchant enquiry screen, and the admin enquiry view.
+5. Send a purchase request or question. It goes directly to the merchant and
+   appears in buyer request history and the merchant enquiry screen. Admin is
+   only involved in artisan verification and product-listing review.
 
 The assistant can also answer catalogue queries such as “Find sarees below
 ₹2,000” and “Tell me about Blue Cotton Saree.” Voice input needs a compatible
 browser and microphone permission; text input is available as a fallback.
 
+Google onboarding stores the selected buyer/merchant role in server-controlled
+Supabase app metadata. New merchant accounts receive a pending artisan profile
+and must be verified before their products appear in the buyer catalogue.
+Google users who already have an assigned role keep that role when signing in.
+Admin access is not available through public Google onboarding; the existing
+admin account remains managed separately.
+
 ## Environment variables
 
-| Variable | Purpose |
-| --- | --- |
-| `PORT` | Express port; defaults to `5000` |
-| `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_PUBLISHABLE_KEY` | Auth sign-in key; legacy `SUPABASE_ANON_KEY` is accepted |
-| `SUPABASE_SECRET_KEY` | Server-only secret; legacy `SUPABASE_SERVICE_ROLE_KEY` is accepted |
-| `DATABASE_URL` | Supabase Postgres connection used by `npm run db:setup` |
-| `LLM_API_KEY` | Optional server-side key for extra AI parsing and image analysis |
-| `LLM_BASE_URL` | Optional OpenAI-compatible API base URL |
-| `LLM_MODEL` | Optional model identifier |
-| `CORS_ORIGIN` | Comma-separated allowed browser origins |
+| Variable                        | Purpose                                                            |
+| ------------------------------- | ------------------------------------------------------------------ |
+| `PORT`                          | Express port; defaults to `5000`                                   |
+| `SUPABASE_URL`                  | Supabase project URL                                               |
+| `SUPABASE_PUBLISHABLE_KEY`      | Auth sign-in key; legacy `SUPABASE_ANON_KEY` is accepted           |
+| `SUPABASE_SECRET_KEY`           | Server-only secret; legacy `SUPABASE_SERVICE_ROLE_KEY` is accepted |
+| `DATABASE_URL`                  | Supabase Postgres connection used by `npm run db:setup`            |
+| `LLM_API_KEY`                   | Optional server-side key for extra AI parsing and image analysis   |
+| `LLM_BASE_URL`                  | Optional OpenAI-compatible API base URL                            |
+| `LLM_MODEL`                     | Optional model identifier                                          |
+| `CORS_ORIGIN`                   | Comma-separated allowed browser origins                            |
+| `VITE_SUPABASE_URL`             | Frontend Supabase URL used to start Google OAuth                   |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Frontend-safe key used to start Google OAuth                       |
 
 ## Validation
 
@@ -131,14 +160,16 @@ npm exec -- eslint -- src/routes/admin.tsx src/routes/user.tsx src/routes/buyers
 ```
 
 The backend integration workflow uses Supabase: create a merchant listing,
-approve it as admin, send a buyer request, and check the updated status across
-workspaces.
+approve it as admin, send a buyer request, let the merchant update its status,
+and check that status in the buyer and merchant workspaces.
 
 ## Limitations
 
 - Purchase requests are not payments or confirmed orders.
+- Google login requires enabling the Google provider and registering the correct
+  OAuth redirect URLs in Supabase and Google Cloud.
 - Crawling of government sites and live exhibition/opportunity feeds has not
   been implemented.
 - Speech recognition availability depends on browser support and permission.
-- Demo accounts and sample reference content are for local demonstration, not
-  production access control or verified live market information.
+- Remaining demo records and sample reference content are for demonstration,
+  not verified live market information.
