@@ -1,32 +1,33 @@
 import { Link } from "@tanstack/react-router";
 import { BarChart3, Home, Mic, Package, ShieldCheck, ShoppingBag, Store, User } from "lucide-react";
 
+import { uiText } from "@/lib/ui-text";
 import { useStore } from "@/lib/store";
 
 const MERCHANT_ITEMS = [
-  { to: "/home", label: "Home", icon: Home },
-  { to: "/products", label: "Products", icon: Package },
-  { to: "/orders", label: "Orders", icon: ShoppingBag },
-  { to: "/sales", label: "Sales", icon: BarChart3 },
-  { to: "/profile", label: "Profile", icon: User },
+  { to: "/home", label: "navHome", icon: Home },
+  { to: "/products", label: "navProductsShort", icon: Package },
+  { to: "/orders", label: "navOrders", icon: ShoppingBag },
+  { to: "/sales", label: "navSales", icon: BarChart3 },
+  { to: "/profile", label: "navProfile", icon: User },
 ] as const;
 
 const BUYER_ITEMS = [
-  { to: "/user", label: "Discover", icon: ShoppingBag },
-  { to: "/admin", label: "Admin", icon: ShieldCheck },
-  { to: "/home", label: "Merchant", icon: Store },
+  { to: "/user", label: "navDiscover", icon: ShoppingBag },
+  { to: "/admin", label: "adminWorkspace", icon: ShieldCheck },
+  { to: "/home", label: "workspace", icon: Store },
 ] as const;
 
 const ADMIN_ITEMS = [
-  { to: "/admin", label: "Overview", icon: ShieldCheck },
-  { to: "/user", label: "Buyer", icon: ShoppingBag },
-  { to: "/home", label: "Merchant", icon: Store },
+  { to: "/admin", label: "navOverview", icon: ShieldCheck },
+  { to: "/user", label: "buyerWorkspace", icon: ShoppingBag },
+  { to: "/home", label: "workspace", icon: Store },
 ] as const;
 
 type NavigationRole = "merchant" | "buyer" | "admin";
 
 export function BottomNavigation({ role = "merchant" }: { role?: NavigationRole }) {
-  const { openAssistant } = useStore();
+  const { openAssistant, language } = useStore();
   const items = role === "buyer" ? BUYER_ITEMS : role === "admin" ? ADMIN_ITEMS : MERCHANT_ITEMS;
 
   return (
@@ -41,7 +42,7 @@ export function BottomNavigation({ role = "merchant" }: { role?: NavigationRole 
               activeProps={{ className: "text-clay font-semibold bg-clay/10" }}
             >
               <Icon className="size-6" strokeWidth={1.8} />
-              {label}
+              {uiText(language, label)}
             </Link>
           ))}
         </nav>
@@ -49,7 +50,7 @@ export function BottomNavigation({ role = "merchant" }: { role?: NavigationRole 
       {role === "merchant" ? (
         <button
           onClick={openAssistant}
-          aria-label="Ask the assistant"
+          aria-label={uiText(language, "assistantButton")}
           className="pointer-events-auto absolute -top-7 left-1/2 grid size-16 -translate-x-1/2 place-items-center rounded-full bg-clay text-white shadow-xl shadow-clay/40 ring-4 ring-paper transition-transform active:scale-95"
         >
           <Mic className="size-7" strokeWidth={1.8} />

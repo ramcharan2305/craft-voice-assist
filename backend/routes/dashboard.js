@@ -17,7 +17,10 @@ router.get("/", requireArtisan, async (req, res, next) => {
     const artisanId = req.artisan.id;
 
     const [products, orders] = await Promise.all([
-      supabase.from("products").select("id,status,review_status,quantity,price").eq("artisan_id", artisanId),
+      supabase
+        .from("products")
+        .select("id,status,review_status,quantity,price")
+        .eq("artisan_id", artisanId),
       supabase.from("orders").select("id,status,amount,quantity").eq("artisan_id", artisanId),
     ]);
 
@@ -31,10 +34,12 @@ router.get("/", requireArtisan, async (req, res, next) => {
 
     res.json({
       totalProducts: productRows.length,
-      listedProducts: productRows.filter((row) => row.status === "listed" && row.review_status === "approved").length,
+      listedProducts: productRows.filter(
+        (row) => row.status === "listed" && row.review_status === "approved",
+      ).length,
       totalOrders: orderRows.length,
       pendingOrders: orderRows.filter((row) => row.status === "pending").length,
-      totalSales: orderRows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0),
+      totalSales: sold.reduce((sum, row) => sum + Number(row.amount ?? 0), 0),
       unitsSold: sold.reduce((sum, row) => sum + Number(row.quantity ?? 0), 0),
       stockValue: productRows
         .filter((row) => row.status !== "sold")

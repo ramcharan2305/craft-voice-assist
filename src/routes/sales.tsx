@@ -10,9 +10,17 @@ export const Route = createFileRoute("/sales")({
   head: () => ({
     meta: [
       { title: "Your business at a glance — H Connect" },
-      { name: "description", content: "Products listed, products sold, money earned and buyer interest in one simple screen." },
+      {
+        name: "description",
+        content:
+          "Products listed, products sold, money earned and buyer interest in one simple screen.",
+      },
       { property: "og:title", content: "Your business at a glance — H Connect" },
-      { property: "og:description", content: "Products listed, products sold, money earned and buyer interest in one simple screen." },
+      {
+        property: "og:description",
+        content:
+          "Products listed, products sold, money earned and buyer interest in one simple screen.",
+      },
     ],
   }),
   component: SalesPage,
@@ -20,13 +28,18 @@ export const Route = createFileRoute("/sales")({
 
 function SalesPage() {
   const { products, sales, openAssistant, dashboard, dashboardStatus } = useStore();
-  const total = dashboardStatus === "ready" ? dashboard.totalSales : sales.reduce((sum, s) => sum + s.amount, 0);
+  const total =
+    dashboardStatus === "ready"
+      ? dashboard.totalSales
+      : sales.reduce((sum, s) => sum + s.amount, 0);
   const interest = products.reduce((sum, p) => sum + p.interest, 0);
 
   return (
     <AppShell>
       <h1 className="text-3xl">Your business at a glance.</h1>
-      <p className="mt-2 text-base text-ink/60">Counted from your products and orders.</p>
+      <p className="mt-2 text-base text-ink/60">
+        Completed and shipped order records; H-Connect does not track payment collection.
+      </p>
 
       <button
         onClick={openAssistant}
@@ -38,9 +51,16 @@ function SalesPage() {
       <div className="mt-8">
         <SalesSummary
           stats={[
-            { label: "Products listed", value: String(dashboardStatus === "ready" ? dashboard.listedProducts : products.filter((p) => p.status === "listed").length) },
-            { label: "Orders", value: String(dashboardStatus === "ready" ? dashboard.totalOrders : sales.length) },
-            { label: "Money earned", value: rupees(total) },
+            {
+              label: "Products listed",
+              value: String(
+                dashboardStatus === "ready"
+                  ? dashboard.listedProducts
+                  : products.filter((p) => p.status === "listed").length,
+              ),
+            },
+            { label: "Completed / shipped orders", value: String(sales.length) },
+            { label: "Recorded order value", value: rupees(total) },
             { label: "Buyers interested", value: String(interest) },
           ]}
         />
@@ -49,7 +69,10 @@ function SalesPage() {
       <section className="mt-8">
         <h2 className="text-lg">What you sold</h2>
         {sales.length === 0 ? (
-          <p className="mt-4 text-base text-ink/60">No orders yet. They will appear here as buyers order your crafts.</p>
+          <p className="mt-4 text-base text-ink/60">
+            No completed or shipped orders are recorded yet. Pending orders are available on the
+            Orders page.
+          </p>
         ) : (
           <div className="mt-4 space-y-3">
             {sales.map((sale) => (
@@ -60,7 +83,9 @@ function SalesPage() {
                     {sale.buyer} · {sale.when}
                   </p>
                 </div>
-                <p className="font-display text-xl font-semibold text-clay">{rupees(sale.amount)}</p>
+                <p className="font-display text-xl font-semibold text-clay">
+                  {rupees(sale.amount)}
+                </p>
               </div>
             ))}
           </div>

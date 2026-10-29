@@ -38,12 +38,10 @@ function ListProductPage() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const image = draft.image ?? "";
-  const suggested = draft.price ?? 600;
-  const marketLow = draft.priceLow ?? Math.max(50, Math.round(suggested * 0.75));
-  const marketHigh = draft.priceHigh ?? Math.max(suggested + 50, Math.round(suggested * 1.4));
-  const priceReason =
-    draft.priceReason ||
-    "Starting estimate. Adjust it to reflect your materials, time, and local buyers.";
+  const suggested = draft.price;
+  const marketLow = draft.priceLow;
+  const marketHigh = draft.priceHigh;
+  const priceReason = draft.priceReason;
 
   const analyzePhoto = async (source: string) => {
     patchDraft({
@@ -184,9 +182,9 @@ function ListProductPage() {
       ) : null}
 
       {failure ? <p className="mt-4 text-base text-destructive">{failure}</p> : null}
-      {step === "price" ? (
+      {step === "price" && suggested !== null ? (
         <p className="mt-4 text-center text-sm text-ink/50">
-          AI estimate {rupees(suggested)}. Review it before publishing.
+          Photo-analysis estimate {rupees(suggested)}. Review it before publishing.
         </p>
       ) : null}
     </AppShell>

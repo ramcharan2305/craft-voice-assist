@@ -14,6 +14,7 @@ import { productApi, type ProductInput } from "@/api/productApi";
 import { useAuth } from "@/lib/auth";
 import {
   DEMO_ARTISAN,
+  LANGUAGES,
   type LanguageId,
   type Product,
   type ProductStatus,
@@ -132,6 +133,24 @@ const StoreContext = createContext<Store | null>(null);
 export function AppStoreProvider({ children }: { children: ReactNode }) {
   const { status: authStatus, user } = useAuth();
   const [language, setLanguage] = useState<LanguageId>("en");
+
+  useEffect(() => {
+    try {
+      const savedLanguage = window.localStorage.getItem("hconnect.language");
+      const preferredLanguage = LANGUAGES.find(({ id }) => id === savedLanguage);
+      if (preferredLanguage) setLanguage(preferredLanguage.id);
+    } catch (error) {
+      console.warn("[store] unable to load language preference:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("hconnect.language", language);
+    } catch (error) {
+      console.warn("[store] unable to save language preference:", error);
+    }
+  }, [language]);
 
   const [profile, setProfile] = useState<ArtisanProfile | null>(DEMO_PROFILE);
   const [profileStatus, setProfileStatus] = useState<LoadStatus>("idle");
@@ -319,13 +338,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   // ----------------------------------------------------------------- sales --
   const sales: Sale[] = useMemo(
     () =>
-      orders.map((order) => ({
-        id: order.id,
-        product: order.product_name,
-        buyer: order.buyer_name,
-        amount: order.amount,
-        when: new Date(order.created_at).toLocaleDateString("en-IN"),
-      })),
+      orders
+        .filter((order) => order.status === "completed" || order.status === "shipped")
+        .map((order) => ({
+          id: order.id,
+          product: order.product_name,
+          buyer: order.buyer_name,
+          amount: order.amount,
+          when: new Date(order.created_at).toLocaleDateString("en-IN"),
+        })),
     [orders],
   );
 

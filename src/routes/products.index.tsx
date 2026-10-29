@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { ErrorNotice } from "@/components/ErrorNotice";
 import { ProductCard } from "@/components/ProductCard";
 import { useStore } from "@/lib/store";
+import { uiText } from "@/lib/ui-text";
 
 export const Route = createFileRoute("/products/")({
   head: () => ({
@@ -26,17 +27,18 @@ export const Route = createFileRoute("/products/")({
 });
 
 const FILTERS = [
-  { id: "all", label: "All" },
-  { id: "pending", label: "Awaiting approval" },
-  { id: "changes_requested", label: "Corrections requested" },
-  { id: "rejected", label: "Not approved" },
-  { id: "listed", label: "In the market" },
-  { id: "draft", label: "Not listed" },
-  { id: "sold", label: "Sold" },
+  { id: "all", label: "productsFilterAll" },
+  { id: "pending", label: "productsFilterPending" },
+  { id: "changes_requested", label: "productsFilterChanges" },
+  { id: "rejected", label: "productsFilterRejected" },
+  { id: "listed", label: "productsFilterListed" },
+  { id: "draft", label: "productsFilterDraft" },
+  { id: "sold", label: "productsFilterSold" },
 ] as const;
 
 function ProductsPage() {
-  const { products, openAssistant, productsStatus, productsError, refreshProducts } = useStore();
+  const { products, openAssistant, productsStatus, productsError, refreshProducts, language } =
+    useStore();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
 
@@ -54,8 +56,8 @@ function ProductsPage() {
 
   return (
     <AppShell>
-      <h1 className="text-3xl">My products</h1>
-      <p className="mt-2 text-base text-ink/60">Tap any product to see it or change it.</p>
+      <h1 className="text-3xl">{uiText(language, "productsTitle")}</h1>
+      <p className="mt-2 text-base text-ink/60">{uiText(language, "productsSubtitle")}</p>
 
       <div className="mt-6 flex flex-wrap gap-2.5">
         {FILTERS.map((option) => (
@@ -64,7 +66,7 @@ function ProductsPage() {
             onClick={() => setFilter(option.id)}
             className={`chip px-4 py-3 text-[15px] font-medium ${filter === option.id ? "bg-clay text-white" : "text-ink"}`}
           >
-            {option.label}
+            {uiText(language, option.label)}
           </button>
         ))}
       </div>
@@ -74,37 +76,37 @@ function ProductsPage() {
           onClick={() => navigate({ to: "/list" })}
           className="flex min-h-16 flex-1 items-center justify-center gap-2 rounded-2xl bg-clay text-lg font-semibold text-white"
         >
-          <Plus className="size-6" /> Add a product
+          <Plus className="size-6" /> {uiText(language, "productsAdd")}
         </button>
         <button
           onClick={openAssistant}
           className="chip flex min-h-16 flex-1 items-center justify-center gap-2 text-base font-medium text-clay"
         >
-          <Mic className="size-5" /> “Show me my sarees”
+          <Mic className="size-5" /> {uiText(language, "productsVoicePrompt")}
         </button>
       </div>
 
       {productsStatus === "loading" ? (
         <p className="mt-8 text-base text-ink/60" aria-live="polite">
-          Loading products…
+          {uiText(language, "productsLoading")}
         </p>
       ) : productsStatus === "error" ? (
         <div className="mt-8">
           <ErrorNotice
             message={productsError ?? "Unable to load products."}
-            actionLabel="Try again"
+            actionLabel={uiText(language, "productsTryAgain")}
             onAction={() => void refreshProducts()}
           />
         </div>
       ) : visible.length === 0 ? (
         <div className="glass mt-8 p-8 text-center">
-          <h2 className="text-xl">Nothing here yet</h2>
-          <p className="mt-2 text-base text-ink/60">Speak to me and I'll add your first product.</p>
+          <h2 className="text-xl">{uiText(language, "productsEmptyTitle")}</h2>
+          <p className="mt-2 text-base text-ink/60">{uiText(language, "productsEmptyText")}</p>
           <button
             onClick={openAssistant}
             className="mt-5 min-h-14 rounded-2xl bg-clay px-6 text-base font-semibold text-white"
           >
-            Tap and speak
+            {uiText(language, "assistantButton")}
           </button>
         </div>
       ) : (

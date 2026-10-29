@@ -7,15 +7,17 @@ using the existing React, Express, and Supabase stack.
 
 - Google sign-in for new buyers and merchants, with workspace selection at onboarding.
 - Merchant workspace with product creation, editing, inventory, profile, and orders.
-- Voice or typed product descriptions; speech recognition is browser-based and
-  the resulting listing remains editable before submission.
+- Telugu and Indian English voice commands and product dictation using Sarvam
+  Saaras v4; recognized text remains visible and listings stay editable.
 - Product submissions require admin review before appearing in the buyer catalogue.
 - Admin artisan verification and product approve/reject/corrections actions,
   with feedback, database-backed review statistics, and the ability to remove
   approved or demo listings.
 - Buyer search, category filters, price limits such as “under ₹2,000,” product
   questions, purchase requests, service requests, and persistent request history.
-- Voice/text assistant searches approved products and stored scheme/market records.
+- Voice/text assistant routes artisan product listings, sales orders, buyer
+  enquiries, price questions, approved catalogue searches, and stored
+  scheme/market records to existing project features.
 - No payment is collected. Web crawling is deferred; market and scheme pages are
   not live event feeds.
 
@@ -41,7 +43,7 @@ extra artisan logins while retaining their existing database records.
 | Frontend           | React 19, TanStack Start, Vite, Tailwind CSS v4                          |
 | Backend            | Node.js, Express 4                                                       |
 | Database and auth  | Supabase PostgreSQL and Supabase Auth                                    |
-| Speech             | Browser SpeechRecognition and SpeechSynthesis                            |
+| Speech             | Sarvam Saaras v4, Mayura v1 translation, and Bulbul v3 (`shubh`)         |
 | Optional assistant | OpenAI-compatible API; core catalogue search works without a paid AI key |
 
 The browser never receives the Supabase service-role key. The Express API
@@ -66,12 +68,14 @@ are restricted by backend role checks.
    SUPABASE_URL=https://<project>.supabase.co
    SUPABASE_PUBLISHABLE_KEY=<publishable-or-anon-key>
    SUPABASE_SECRET_KEY=<server-only-secret-or-service-role-key>
+   SARVAM_API_KEY=<server-only-Sarvam-key>
    DATABASE_URL=postgresql://...
    ```
 
    `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are also accepted as
    legacy variable names. Never put the secret/service-role key in a frontend
-   environment file.
+   environment file. `SARVAM_API_KEY` must also stay in `backend/.env`; never
+   add it to a `VITE_` variable or frontend environment file.
 
 3. Configure frontend Google sign-in by copying the root `.env.example` to `.env`:
 
@@ -125,9 +129,25 @@ are restricted by backend role checks.
    appears in buyer request history and the merchant enquiry screen. Admin is
    only involved in artisan verification and product-listing review.
 
-The assistant can also answer catalogue queries such as “Find sarees below
-₹2,000” and “Tell me about Blue Cotton Saree.” Voice input needs a compatible
-browser and microphone permission; text input is available as a fallback.
+The assistant understands natural-language requests in Telugu and English
+(India), including showing the artisan's products, opening the product listing
+flow, viewing completed/shipped orders, and opening actual buyer enquiries.
+When no saved listing price is available, price help collects the product,
+material cost, labour cost (or hours and the artisan's hourly rate), and the
+artisan's chosen profit percentage before calculating a cost-based estimate.
+It does not invent costs, labour rates, or profit margins. It also searches the
+approved catalogue, stored schemes, and market records. “Show sales” reports
+recorded order values; H-Connect does not collect or verify payments.
+
+Voice input records a short microphone clip in the browser and sends it to the
+authenticated backend for Sarvam Saaras v4 transcription. Telugu commands and
+responses use Sarvam Mayura translation; spoken replies and voice previews use
+Bulbul v3's Shubh speaker in the selected `te-IN` or `en-IN` language. Text
+remains available if translation or voice playback fails. Microphone access
+requires browser permission and a secure context (HTTPS or localhost).
+Selecting Telugu also translates the assistant, primary navigation, and the
+home and products screens. The assistant shows Telugu example commands when
+Telugu is selected.
 
 Google onboarding stores the selected buyer/merchant role in server-controlled
 Supabase app metadata. New merchant accounts receive a pending artisan profile
@@ -146,6 +166,7 @@ admin account remains managed separately.
 | `SUPABASE_SECRET_KEY`           | Server-only secret; legacy `SUPABASE_SERVICE_ROLE_KEY` is accepted |
 | `DATABASE_URL`                  | Supabase Postgres connection used by `npm run db:setup`            |
 | `LLM_API_KEY`                   | Optional server-side key for extra AI parsing and image analysis   |
+| `SARVAM_API_KEY`                | Server-only Sarvam key for speech, translation, and text-to-speech |
 | `LLM_BASE_URL`                  | Optional OpenAI-compatible API base URL                            |
 | `LLM_MODEL`                     | Optional model identifier                                          |
 | `CORS_ORIGIN`                   | Comma-separated allowed browser origins                            |
@@ -170,6 +191,9 @@ and check that status in the buyer and merchant workspaces.
   OAuth redirect URLs in Supabase and Google Cloud.
 - Crawling of government sites and live exhibition/opportunity feeds has not
   been implemented.
-- Speech recognition availability depends on browser support and permission.
+- Voice requires a configured Sarvam API key, browser microphone support, and
+  microphone permission. Typed commands remain available when voice fails.
+- Order values are not proof of received payments; monthly sales and payment
+  tracking are not implemented.
 - Remaining demo records and sample reference content are for demonstration,
   not verified live market information.

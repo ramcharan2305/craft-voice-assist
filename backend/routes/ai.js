@@ -1,9 +1,15 @@
-import { Router } from "express";
+import express, { Router } from "express";
 
 import { requireSupabase, supabaseConfigured } from "../db.js";
 import { requireArtisan } from "../middleware/auth.js";
-import { analyzeProductImage, answerQuestion, parseCommand } from "../services/aiService.js";
-import { toOrder, toProduct } from "../services/mappers.js";
+import {
+  analyzeProductImage,
+  answerQuestion,
+  calculateCostBasedPrice,
+  parseCommand,
+} from "../services/aiService.js";
+import { synthesizeSpeech, transcribeAudio, translateText } from "../services/sarvamService.js";
+import { toEnquiry, toOrder, toProduct } from "../services/mappers.js";
 import {
   REFERENCE_SCHEMES,
   REFERENCE_TRAINING,
@@ -13,6 +19,64 @@ import {
 const router = Router();
 
 const rupees = (value) => `₹${Number(value ?? 0).toLocaleString("en-IN")}`;
+const hasLanguage = (language) => language === "en" || language === "te";
+
+router.post(
+  "/speech-to-text",
+  requireArtisan,
+  express.raw({ type: "audio/*", limit: "10mb" }),
+  async (req, res, next) => {
+    try {
+      const language = req.query.language;
+      if (!hasLanguage(language)) {
+        return res.status(400).json({ error: "Choose Telugu or English before recording." });
+      }
+      const transcript = await transcribeAudio(req.body, req.get("content-type"), language);
+      return res.json({ transcript });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+router.post("/translate", requireArtisan, async (req, res, next) => {
+  try {
+    const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+    const language = req.body?.language;
+    if (!text || text.length > 2500) {
+      return res
+        .status(400)
+        .json({ error: "Text to translate must be between 1 and 2,500 characters." });
+    }
+    if (!hasLanguage(language)) {
+      return res.status(400).json({ error: "Choose Telugu or English for translation." });
+    }
+    const translated = language === "te" ? await translateText(text, "en", "te") : text;
+    return res.json({ text: translated });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/speech", requireArtisan, async (req, res, next) => {
+  try {
+    const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+    const language = req.body?.language;
+    if (!text || text.length > 2500) {
+      return res
+        .status(400)
+        .json({ error: "Spoken responses must be between 1 and 2,500 characters." });
+    }
+    if (!hasLanguage(language)) {
+      return res.status(400).json({ error: "Choose Telugu or English for voice playback." });
+    }
+    const audio = await synthesizeSpeech(text, language);
+    return res.type("audio/wav").send(audio);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 function catalogSearchText(text) {
   return text
     .toLowerCase()
@@ -176,6 +240,7 @@ router.post("/command", requireArtisan, async (req, res, next) => {
   try {
     const text = String(req.body?.text ?? "").trim();
     const pending = req.body?.pending ?? null;
+    const language = req.body?.language ?? "en";
     const image =
       typeof req.body?.image === "string" &&
       req.body.image.length <= 1_800_000 &&
@@ -188,11 +253,24 @@ router.post("/command", requireArtisan, async (req, res, next) => {
         : null;
 
     if (!text) return res.status(400).json({ error: "Please say or type something first." });
+    if (text.length > 1000) {
+      return res.status(400).json({ error: "Please keep a voice command under 1,000 characters." });
+    }
+    if (!hasLanguage(language)) {
+      return res.status(400).json({ error: "Choose Telugu or English for voice commands." });
+    }
 
-    const { result, source } = await parseCommand(text, pending);
+    const commandText =
+      language === "te" && /[\u0c00-\u0c7f]/u.test(text)
+        ? await translateText(text, "te", "en")
+        : text;
+    const { result, source } = await parseCommand(commandText, pending);
     const needsArtisan = [
       "CREATE_PRODUCT",
       "VIEW_PRODUCTS",
+      "VIEW_SALES",
+      "VIEW_ENQUIRIES",
+      "GET_PRICE_HELP",
       "UPDATE_PRODUCT",
       "DELETE_PRODUCT",
       "VIEW_ORDERS",
@@ -220,6 +298,175 @@ router.post("/command", requireArtisan, async (req, res, next) => {
           speak: message,
           navigate: "/products",
           data: { products },
+        });
+      }
+
+      case "VIEW_SALES": {
+        const supabase = requireSupabase();
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*, products(name)")
+          .eq("artisan_id", req.artisan.id)
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        const orders = data.map((row) => ({
+          ...toOrder(row, row.products?.name),
+          product_name: row.products?.name ?? "Product",
+        }));
+        const completedSales = orders.filter(
+          (order) => order.status === "completed" || order.status === "shipped",
+        );
+        const value = completedSales.reduce((sum, order) => sum + order.amount, 0);
+        const message = completedSales.length
+          ? `I found ${completedSales.length} completed or shipped order${completedSales.length === 1 ? "" : "s"} with a recorded total value of ${rupees(value)}. H-Connect does not record payment collection.`
+          : orders.length
+            ? `There are ${orders.length} recorded order${orders.length === 1 ? "" : "s"}, but none are completed or shipped yet. H-Connect does not record payment collection.`
+            : "No orders or sales are recorded yet. H-Connect does not record payment collection.";
+        return res.json({
+          intent: result.intent,
+          message,
+          speak: message,
+          navigate: "/sales",
+          data: { orders },
+        });
+      }
+
+      case "VIEW_ENQUIRIES": {
+        const supabase = requireSupabase();
+        const { data, error } = await supabase
+          .from("enquiries")
+          .select("*, products(name,image_url), artisans(name)")
+          .eq("artisan_id", req.artisan.id)
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        const enquiries = data.map(toEnquiry);
+        const message = enquiries.length
+          ? `I found ${enquiries.length} buyer enquiry${enquiries.length === 1 ? "" : "ies"}.`
+          : "There are no buyer enquiries recorded yet.";
+        return res.json({
+          intent: result.intent,
+          message,
+          speak: message,
+          navigate: "/buyers",
+          data: { enquiries },
+        });
+      }
+
+      case "GET_PRICE_HELP": {
+        if (pending?.intent === "GET_PRICE_HELP") {
+          const details = result.pricingDetails ?? pending.pricingDetails ?? {};
+          const laborCost =
+            Number(details.laborCost) > 0
+              ? Number(details.laborCost)
+              : Number(details.laborHours) > 0 && Number(details.hourlyRate) > 0
+                ? Number(details.laborHours) * Number(details.hourlyRate)
+                : null;
+          const missingField = !details.productName
+            ? "productName"
+            : !Number.isFinite(Number(details.materialCost)) || Number(details.materialCost) < 0
+              ? "materialCost"
+              : laborCost === null
+                ? "laborCost"
+                : !Number.isFinite(Number(details.profitPercent)) ||
+                    Number(details.profitPercent) < 0 ||
+                    Number(details.profitPercent) > 500
+                  ? "profitPercent"
+                  : null;
+
+          if (missingField) {
+            const questions = {
+              productName: "Which saree or model are you pricing? Tell me its name.",
+              materialCost:
+                "How much did the materials or fabric for that saree cost? Please give the amount in rupees.",
+              laborCost:
+                "What is the total labour cost for one saree, or how many hours does it take and what is your own hourly rate?",
+              profitPercent:
+                "What profit percentage would you like to add to your costs? For example, 20 percent.",
+            };
+            const question = questions[missingField];
+            return res.json({
+              intent: result.intent,
+              needsInput: true,
+              missingField,
+              question,
+              pending: {
+                intent: "GET_PRICE_HELP",
+                product: {},
+                missingField,
+                pricingDetails: details,
+              },
+            });
+          }
+
+          const materialCost = Number(details.materialCost);
+          const extraCost = Number(details.extraCost ?? 0);
+          const { productionCost, suggestedPrice } = calculateCostBasedPrice({
+            materialCost,
+            laborCost,
+            extraCost,
+            profitPercent: Number(details.profitPercent),
+          });
+          const message = `Based on the details you gave for ${details.productName}, your material cost is ${rupees(materialCost)}, labour is ${rupees(laborCost)}, and other costs are ${rupees(extraCost)}. That makes a production cost of ${rupees(productionCost)}. With your requested ${details.profitPercent}% profit, the suggested price is ${rupees(suggestedPrice)}. This is a calculation from your inputs, not verified market pricing.`;
+          return res.json({
+            intent: result.intent,
+            message,
+            speak: message,
+            data: {
+              pricing: {
+                productName: details.productName,
+                materialCost,
+                laborCost,
+                extraCost,
+                productionCost,
+                profitPercent: Number(details.profitPercent),
+                suggestedPrice,
+              },
+            },
+          });
+        }
+
+        const products = await loadProducts(req.artisan.id);
+        const product = findProduct(products, result.target);
+        if (product && product.price > 0) {
+          const message = `Your existing ${product.name} listing is priced at ${rupees(product.price)}. This is your saved listing price, not a market valuation.`;
+          return res.json({
+            intent: result.intent,
+            message,
+            speak: message,
+            navigate: "/products",
+            data: { products: [product] },
+          });
+        }
+
+        const suggestedPrice = Number(imageContext?.suggestedPrice);
+        if (
+          imageContext?.name &&
+          Number.isFinite(suggestedPrice) &&
+          suggestedPrice > 0 &&
+          (!result.target ||
+            String(result.target).toLowerCase().includes(imageContext.name.toLowerCase()))
+        ) {
+          const message = `The photo analysis for your ${imageContext.name} draft estimated ${rupees(suggestedPrice)}. This is an AI estimate, not verified market pricing.`;
+          return res.json({
+            intent: result.intent,
+            message,
+            speak: message,
+            navigate: "/list",
+          });
+        }
+
+        return res.json({
+          intent: result.intent,
+          needsInput: true,
+          missingField: "productName",
+          question:
+            "Tell me the saree or model name, material cost in rupees, labour cost (or hours and your hourly rate), and the profit percentage you want. For example: Pochampally silk saree; material cost ₹1,200; 10 hours; ₹150 per hour; 20% profit.",
+          pending: {
+            intent: "GET_PRICE_HELP",
+            product: {},
+            missingField: "productName",
+            pricingDetails: {},
+          },
         });
       }
 
@@ -326,8 +573,8 @@ router.post("/command", requireArtisan, async (req, res, next) => {
       case "FIND_CATALOG":
       case "PRODUCT_INFO": {
         const supabase = requireSupabase();
-        const query = catalogSearchText(text);
-        const maxPrice = maxPriceFrom(text);
+        const query = catalogSearchText(commandText);
+        const maxPrice = maxPriceFrom(commandText);
         const { data, error } = await supabase
           .from("products")
           .select("*, artisans!inner(name, location, craft_type, verification_status)")
@@ -392,7 +639,7 @@ router.post("/command", requireArtisan, async (req, res, next) => {
         } else {
           items = REFERENCE_MARKET;
         }
-        const exhibitionQuery = /exhibition|event|fair|trade show/i.test(text);
+        const exhibitionQuery = /exhibition|event|fair|trade show/i.test(commandText);
         const filtered = items.filter((item) => {
           const body =
             `${item.product_category} ${item.region} ${item.demand} ${item.trend}`.toLowerCase();

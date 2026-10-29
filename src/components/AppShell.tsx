@@ -21,22 +21,23 @@ import { VoiceAssistantSheet } from "@/components/VoiceAssistantSheet";
 import { AuthRedirect, useAuth } from "@/lib/auth";
 import { LANGUAGES } from "@/lib/mock-data";
 import { useStore } from "@/lib/store";
+import { uiText } from "@/lib/ui-text";
 
 const MERCHANT_NAV = [
-  { to: "/home", label: "Home", icon: Home },
-  { to: "/products", label: "My products", icon: Package },
-  { to: "/orders", label: "Orders", icon: ShoppingBag },
-  { to: "/sales", label: "Sales", icon: BarChart3 },
-  { to: "/buyers", label: "Buyers", icon: TrendingUp },
-  { to: "/schemes", label: "Schemes", icon: Landmark },
-  { to: "/training", label: "Training", icon: BookOpen },
-  { to: "/market", label: "Market", icon: LineChart },
-  { to: "/profile", label: "Profile", icon: User },
-  { to: "/help", label: "Help", icon: CircleHelp },
+  { to: "/home", label: "navHome", icon: Home },
+  { to: "/products", label: "navProducts", icon: Package },
+  { to: "/orders", label: "navOrders", icon: ShoppingBag },
+  { to: "/sales", label: "navSales", icon: BarChart3 },
+  { to: "/buyers", label: "navBuyers", icon: TrendingUp },
+  { to: "/schemes", label: "navSchemes", icon: Landmark },
+  { to: "/training", label: "navTraining", icon: BookOpen },
+  { to: "/market", label: "navMarket", icon: LineChart },
+  { to: "/profile", label: "navProfile", icon: User },
+  { to: "/help", label: "navHelp", icon: CircleHelp },
 ] as const;
 
-const BUYER_NAV = [{ to: "/user", label: "Discover crafts", icon: ShoppingBag }] as const;
-const ADMIN_NAV = [{ to: "/admin", label: "Overview", icon: ShieldCheck }] as const;
+const BUYER_NAV = [{ to: "/user", label: "navDiscover", icon: ShoppingBag }] as const;
+const ADMIN_NAV = [{ to: "/admin", label: "navOverview", icon: ShieldCheck }] as const;
 
 type AppRole = "merchant" | "buyer" | "admin";
 
@@ -62,13 +63,12 @@ function AppShellContent({ children, role }: { children: ReactNode; role: AppRol
   const { artisan, language, notice, clearNotice, openAssistant } = useStore();
   const { user } = useAuth();
   const lang = LANGUAGES.find((l) => l.id === language) ?? LANGUAGES[2];
+  const languageName = language === "te" ? "తెలుగు" : lang.name;
   const nav = role === "buyer" ? BUYER_NAV : role === "admin" ? ADMIN_NAV : MERCHANT_NAV;
-  const roleLabel =
-    role === "buyer"
-      ? "Buyer workspace"
-      : role === "admin"
-        ? "Admin workspace"
-        : "Merchant workspace";
+  const roleLabel = uiText(
+    language,
+    role === "buyer" ? "buyerWorkspace" : role === "admin" ? "adminWorkspace" : "workspace",
+  );
   const contentWidth = role === "merchant" ? "max-w-[44rem]" : "max-w-[72rem]";
 
   useEffect(() => {
@@ -90,11 +90,7 @@ function AppShellContent({ children, role }: { children: ReactNode; role: AppRol
               <span>
                 <span className="block font-display text-lg font-semibold">H Connect</span>
                 <span className="block text-sm text-ink/55">
-                  {role === "merchant"
-                    ? "Your craft assistant"
-                    : role === "buyer"
-                      ? "Handloom marketplace"
-                      : "Marketplace management"}
+                  {role === "merchant" ? uiText(language, "assistantBrand") : "H Connect"}
                 </span>
               </span>
             </Link>
@@ -110,7 +106,7 @@ function AppShellContent({ children, role }: { children: ReactNode; role: AppRol
                   activeProps={{ className: "bg-white/70 text-clay font-semibold" }}
                 >
                   <Icon className="size-5" strokeWidth={1.8} />
-                  {label}
+                  {uiText(language, label)}
                 </Link>
               ))}
             </nav>
@@ -123,15 +119,15 @@ function AppShellContent({ children, role }: { children: ReactNode; role: AppRol
                   onClick={openAssistant}
                   className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-clay text-base font-semibold text-white"
                 >
-                  <Mic className="size-5" /> Tap and speak
+                  <Mic className="size-5" /> {uiText(language, "assistantButton")}
                 </button>
                 <div className="chip flex items-center gap-2 px-3 py-2">
                   <span className="grid size-8 place-items-center rounded-full bg-clay text-xs font-semibold text-white">
                     {lang.short}
                   </span>
-                  <span className="text-sm font-medium">{lang.name}</span>
+                  <span className="text-sm font-medium">{languageName}</span>
                   <Link to="/language" className="ml-auto text-sm font-medium text-clay">
-                    Change
+                    {uiText(language, "changeLanguage")}
                   </Link>
                 </div>
                 <p className="px-1 text-xs text-ink/50">
@@ -145,7 +141,7 @@ function AppShellContent({ children, role }: { children: ReactNode; role: AppRol
               to="/logout"
               className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-ink/10 text-sm font-medium text-ink/65 hover:bg-white/50"
             >
-              <LogOut className="size-4" /> Sign out
+              <LogOut className="size-4" /> {uiText(language, "signOut")}
             </Link>
           </div>
         </aside>
@@ -158,7 +154,7 @@ function AppShellContent({ children, role }: { children: ReactNode; role: AppRol
                 to="/logout"
                 className="chip flex items-center gap-1.5 px-3 py-2 text-xs font-medium"
               >
-                <LogOut className="size-3.5" /> Sign out
+                <LogOut className="size-3.5" /> {uiText(language, "signOut")}
               </Link>
             </div>
             {children}

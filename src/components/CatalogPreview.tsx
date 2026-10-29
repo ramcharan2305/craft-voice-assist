@@ -84,11 +84,16 @@ export function CatalogPreview({ draft, onChange, onContinue }: Props) {
                   {speech.supported ? (
                     <button
                       type="button"
+                      disabled={speech.transcribing}
                       onClick={() => (speech.listening ? speech.stop() : speech.start())}
                       className="chip mt-2 inline-flex min-h-11 items-center gap-2 px-4 text-sm font-medium text-clay"
                     >
                       <Mic className="size-4" />{" "}
-                      {speech.listening ? "Stop dictating" : "Dictate description"}
+                      {speech.listening
+                        ? "Stop dictating"
+                        : speech.transcribing
+                          ? "Transcribing…"
+                          : "Dictate description"}
                     </button>
                   ) : (
                     <p className="mt-2 text-xs text-ink/50">

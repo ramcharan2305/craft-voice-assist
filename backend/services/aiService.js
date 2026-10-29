@@ -12,6 +12,9 @@ const INTENTS = [
   "UPDATE_PRODUCT",
   "DELETE_PRODUCT",
   "VIEW_ORDERS",
+  "VIEW_SALES",
+  "VIEW_ENQUIRIES",
+  "GET_PRICE_HELP",
   "FIND_SCHEMES",
   "FIND_CATALOG",
   "PRODUCT_INFO",
@@ -48,6 +51,9 @@ Rules:
 - "target" is the product being updated or deleted, without the words change, price, remove or delete.
 - "query" is the craft, category or topic the user is asking about (schemes, training, market).
 - Use FIND_CATALOG for requests to search buyer-visible products, and PRODUCT_INFO when someone asks for details about a named product.
+- Use VIEW_PRODUCTS for the artisan's own listings, VIEW_SALES for recorded order/sales data, and VIEW_ENQUIRIES for buyer requests.
+- Use GET_PRICE_HELP for questions about what to charge. Never invent or estimate a price without reliable product or pricing data.
+- A request to list/add/create a product is CREATE_PRODUCT; a request to list/show existing products is VIEW_PRODUCTS.
 - Use FIND_OPPORTUNITIES for exhibitions, events, and other market opportunities. Do not create or infer opportunity details.
 - If a previous step is pending, merge the new information into it. A bare answer such as "five" fills in the pending quantity.
 - Use GENERAL_QUESTION for greetings, help and anything you cannot map to the intents above.
@@ -165,6 +171,102 @@ function spokenNumber(text) {
 
 const has = (text, words) => words.some((word) => text.includes(word));
 
+function pricingNumber(text, labels) {
+  const labelPattern = labels.join("|");
+  const match = text.match(
+    new RegExp(`(?:${labelPattern})[^\\d]{0,30}(?:₹\\s*|rs\\.?\\s*)?([\\d,]+(?:\\.\\d+)?)`, "i"),
+  );
+  return match ? Number(match[1].replace(/,/g, "")) : null;
+}
+
+function collectPricingDetails(text, current = {}) {
+  const next = { ...current };
+  const materialCost = pricingNumber(text, [
+    "material(?:s)?(?:\\s+cost)?",
+    "fabric(?:\\s+cost)?",
+    "cloth(?:\\s+cost)?",
+  ]);
+  const laborCost = pricingNumber(text, [
+    "(?:total\\s+)?labor(?:u)?r?\\s+cost",
+    "stitching\\s+cost",
+    "work(?:ing)?\\s+cost",
+  ]);
+  const hourlyText = text.match(
+    /(?:₹\s*)?([\d,]+(?:\.\d+)?)\s*(?:rupees?|rs\.?)?\s*(?:\/|per)\s*hour/i,
+  )?.[1];
+  const hourlyRate =
+    pricingNumber(text, ["hourly\\s+rate", "rate\\s+per\\s+hour"]) ??
+    (hourlyText ? Number(hourlyText.replace(/,/g, "")) : null);
+  const laborHours = Number(text.match(/([\d.]+)\s*(?:hours?|hrs?)(?!\s*per)/i)?.[1] ?? NaN);
+  const extraCost = pricingNumber(text, [
+    "packaging(?:\\s+cost)?",
+    "other\\s+costs?",
+    "additional\\s+costs?",
+  ]);
+  const profitMatch =
+    text.match(/(?:profit|markup|margin)[^\d]{0,20}([\d.]+)\s*(?:%|percent)?/i) ??
+    text.match(/([\d.]+)\s*(?:%|percent)\s*(?:profit|markup|margin)?/i);
+  const profitPercent = profitMatch ? Number(profitMatch[1]) : null;
+  const bareAmountMatch = text.match(
+    /^\s*(?:₹\s*|rs\.?\s*)?([\d,]+(?:\.\d+)?)\s*(?:rupees?)?\s*$/i,
+  );
+  const bareAmount = bareAmountMatch ? Number(bareAmountMatch[1].replace(/,/g, "")) : null;
+  const firstAmountMatch = text.match(/(?:₹\s*|rs\.?\s*)?([\d,]+(?:\.\d+)?)/i);
+  const firstAmount = firstAmountMatch ? Number(firstAmountMatch[1].replace(/,/g, "")) : null;
+
+  if (materialCost !== null && Number.isFinite(materialCost)) next.materialCost = materialCost;
+  if (laborCost !== null && Number.isFinite(laborCost)) next.laborCost = laborCost;
+  if (hourlyRate !== null && Number.isFinite(hourlyRate)) next.hourlyRate = hourlyRate;
+  if (Number.isFinite(laborHours) && laborHours > 0) next.laborHours = laborHours;
+  if (extraCost !== null && Number.isFinite(extraCost)) next.extraCost = extraCost;
+  if (profitPercent !== null && Number.isFinite(profitPercent)) next.profitPercent = profitPercent;
+  if (bareAmount !== null) {
+    if (current.missingField === "materialCost") next.materialCost = bareAmount;
+    if (current.missingField === "laborCost") next.laborCost = bareAmount;
+    if (current.missingField === "profitPercent") next.profitPercent = bareAmount;
+  }
+  if (firstAmount !== null && Number.isFinite(firstAmount)) {
+    if (current.missingField === "materialCost" && next.materialCost === undefined) {
+      next.materialCost = firstAmount;
+    }
+    if (
+      current.missingField === "laborCost" &&
+      next.laborCost === undefined &&
+      !(next.laborHours > 0 && next.hourlyRate > 0)
+    ) {
+      next.laborCost = firstAmount;
+    }
+    if (current.missingField === "profitPercent" && next.profitPercent === undefined) {
+      next.profitPercent = firstAmount;
+    }
+  }
+
+  const productDescription = text
+    .split(
+      /\b(?:material(?:s)?(?:\s+cost)?|fabric(?:\s+cost)?|cloth(?:\s+cost)?|labor|labour|hourly|profit|markup|margin|packaging)\b/i,
+    )[0]
+    .replace(
+      /^[\s,;]*(?:(?:my|the|this)\s+)?(?:(?:product|model)\s+(?:is|named)\s+|it is\s+|it’s\s+)?(?:a|an)\s+/i,
+      "",
+    )
+    .replace(/[\s,;]+$/g, "")
+    .trim();
+  if (productDescription && !/\d/.test(productDescription) && productDescription.length <= 80) {
+    next.productName = productDescription;
+  }
+
+  delete next.missingField;
+  return next;
+}
+
+export function calculateCostBasedPrice({ materialCost, laborCost, extraCost = 0, profitPercent }) {
+  const productionCost = materialCost + laborCost + extraCost;
+  return {
+    productionCost,
+    suggestedPrice: Math.ceil(productionCost * (1 + profitPercent / 100)),
+  };
+}
+
 /**
  * Offline intent parser. Deliberately simple and predictable: it is the safety
  * net when no LLM key is configured.
@@ -194,21 +296,60 @@ function parseLocally(text, pending) {
     };
   }
 
-  if (
-    has(lower, ["find", "search", "show me", "look for", "browse"]) &&
+  const ownProductRequest =
     has(lower, [
-      "saree",
-      "sari",
-      "basket",
-      "pottery",
-      "craft",
-      "product",
-      "under",
-      "below",
-      "₹",
-      "rupee",
-      "rs",
-    ])
+      "my product",
+      "my listing",
+      "my catalog",
+      "my catalogue",
+      "products i have",
+      "my own",
+    ]) ||
+    (has(lower, ["show", "display", "view", "see", "list"]) &&
+      has(lower, ["approved product", "listed product"])) ||
+    (/\b(?:show|display|view|see)\b/.test(lower) &&
+      /\bmy\b/.test(lower) &&
+      !has(lower, [
+        "sale",
+        "sales",
+        "revenue",
+        "order",
+        "orders",
+        "buyer",
+        "buyers",
+        "enquiry",
+        "enquiries",
+        "price",
+        "charge",
+        "income",
+      ]));
+  if (ownProductRequest) {
+    return {
+      intent: "VIEW_PRODUCTS",
+      product: normaliseProduct(null),
+      target: null,
+      price: null,
+      quantity: null,
+      query: null,
+    };
+  }
+
+  if (
+    (has(lower, ["find", "search", "show me", "look for", "browse"]) &&
+      !has(lower, ["my products", "my product", "my catalog", "my catalogue", "products i have"]) &&
+      has(lower, [
+        "saree",
+        "sari",
+        "basket",
+        "pottery",
+        "craft",
+        "product",
+        "under",
+        "below",
+        "₹",
+        "rupee",
+      ])) ||
+    /\brs\b/.test(lower)
   ) {
     return {
       intent: "FIND_CATALOG",
@@ -237,6 +378,21 @@ function parseLocally(text, pending) {
     };
   }
 
+  if (pending?.intent === "GET_PRICE_HELP") {
+    return {
+      intent: "GET_PRICE_HELP",
+      product: normaliseProduct(null),
+      target: clean(lower),
+      price: null,
+      quantity: null,
+      query: null,
+      pricingDetails: collectPricingDetails(text, {
+        ...pending.pricingDetails,
+        missingField: pending.missingField,
+      }),
+    };
+  }
+
   if (has(lower, ["remove", "delete", "unlist", "take down", "stop selling"])) {
     return {
       intent: "DELETE_PRODUCT",
@@ -257,6 +413,90 @@ function parseLocally(text, pending) {
       product: normaliseProduct(null),
       target: clean(lower),
       price: spokenNumber(lower),
+      quantity: null,
+      query: null,
+    };
+  }
+
+  const productConcept = has(lower, [
+    "product",
+    "products",
+    "listing",
+    "listings",
+    "catalog",
+    "catalogue",
+    "inventory",
+    "item",
+    "items",
+  ]);
+  const viewAction =
+    has(lower, ["show", "display", "view", "see", "find", "get", "browse", "what", "which"]) ||
+    (has(lower, ["list"]) &&
+      has(lower, [
+        "my products",
+        "all products",
+        "product catalog",
+        "product catalogue",
+        "inventory",
+      ]));
+
+  if (
+    has(lower, ["buyers", "buyer", "enquiries", "enquiry", "requests", "leads"]) &&
+    (viewAction || has(lower, ["buyer", "buyers", "enquiries", "enquiry"]))
+  ) {
+    return {
+      intent: "VIEW_ENQUIRIES",
+      product: normaliseProduct(null),
+      target: null,
+      price: null,
+      quantity: null,
+      query: null,
+    };
+  }
+
+  if (
+    has(lower, ["sales", "revenue", "earned", "income", "sold"]) &&
+    (viewAction || has(lower, ["sales", "revenue", "earned", "income", "sold"]))
+  ) {
+    return {
+      intent: "VIEW_SALES",
+      product: normaliseProduct(null),
+      target: null,
+      price: null,
+      quantity: null,
+      query: null,
+    };
+  }
+
+  if (
+    has(lower, ["charge", "price", "how much", "cost", "rate", "pricing", "what should i ask"]) &&
+    !has(lower, ["price range", "how much do people pay", "market price", "best price"])
+  ) {
+    const targetMatch = lower.match(/(?:for|on|of)\s+(?:my\s+)?([a-z0-9][a-z0-9 ]{1,60})/);
+    const target = targetMatch?.[1]
+      ?.replace(/^(?:this|that|product|item)\b\s*/i, "")
+      .replace(/\b(?:please|now|today)\b.*$/i, "")
+      .trim();
+    return {
+      intent: "GET_PRICE_HELP",
+      product: normaliseProduct(null),
+      target: target ? clean(target) : null,
+      price: null,
+      quantity: null,
+      query: null,
+    };
+  }
+
+  if (
+    productConcept &&
+    viewAction &&
+    !has(lower, ["add", "create", "publish", "upload", "sell", "new product"])
+  ) {
+    return {
+      intent: "VIEW_PRODUCTS",
+      product: normaliseProduct(null),
+      target: null,
+      price: null,
       quantity: null,
       query: null,
     };
@@ -345,7 +585,7 @@ function parseLocally(text, pending) {
   }
 
   if (
-    has(lower, ["list", "sell", "add", "post", "put"]) &&
+    has(lower, ["list", "sell", "add", "post", "put", "create", "publish", "upload"]) &&
     !has(lower, ["list my products", "show my products"])
   ) {
     const currencyMatch = lower.match(/(\d[\d,]{1,7})\s*(?:rupees?|rs\b|₹)/);
@@ -358,7 +598,7 @@ function parseLocally(text, pending) {
     const name = lower
       .replace(/(\d[\d,]*)/g, " ")
       .replace(
-        /\b(rupees?|rupee|rs|paise|only|please|list|my|for|at|price|and|available|in|stock|selling|sell|add|post|put|online)\b/g,
+        /\b(rupees?|rupee|rs|paise|only|please|list|my|for|at|price|and|available|in|stock|selling|sell|add|post|put|create|publish|upload|online|a|an|product|listing|new)\b/g,
         " ",
       )
       .replace(/[^\p{L}\p{N}\s]/gu, " ")
@@ -542,7 +782,17 @@ export async function parseCommand(text, pending = null) {
   }
 
   const localResult = parseLocally(input, pending);
-  if (["FIND_CATALOG", "PRODUCT_INFO", "FIND_OPPORTUNITIES"].includes(localResult.intent)) {
+  if (
+    [
+      "FIND_CATALOG",
+      "PRODUCT_INFO",
+      "FIND_OPPORTUNITIES",
+      "VIEW_PRODUCTS",
+      "VIEW_SALES",
+      "VIEW_ENQUIRIES",
+      "GET_PRICE_HELP",
+    ].includes(localResult.intent)
+  ) {
     return { result: localResult, source: "local" };
   }
   if (localResult.intent === "GENERAL_QUESTION") {

@@ -2,9 +2,12 @@ import type { Order } from "./orderApi";
 import type { Scheme } from "./schemeApi";
 import type { TrainingResource } from "./trainingApi";
 import type { MarketResponse } from "./marketApi";
+import type { BuyerRequest } from "./buyerApi";
 import type { Product } from "@/lib/mock-data";
 
-import { apiFetch } from "./client";
+import { apiFetch, apiFetchBlob } from "./client";
+
+export type VoiceLanguage = "en" | "te";
 
 export type AiIntent =
   | "CREATE_PRODUCT"
@@ -12,6 +15,9 @@ export type AiIntent =
   | "UPDATE_PRODUCT"
   | "DELETE_PRODUCT"
   | "VIEW_ORDERS"
+  | "VIEW_SALES"
+  | "VIEW_ENQUIRIES"
+  | "GET_PRICE_HELP"
   | "FIND_SCHEMES"
   | "FIND_CATALOG"
   | "PRODUCT_INFO"
@@ -50,6 +56,15 @@ export type AiPending = {
   product: AiProduct;
   productId?: string;
   missingField: string;
+  pricingDetails?: {
+    productName?: string;
+    materialCost?: number;
+    laborCost?: number;
+    laborHours?: number;
+    hourlyRate?: number;
+    extraCost?: number;
+    profitPercent?: number;
+  };
 };
 
 export type AiCommandResponse = {
@@ -78,10 +93,20 @@ export type AiCommandResponse = {
   data?: {
     products?: Product[];
     orders?: Order[];
+    enquiries?: BuyerRequest[];
     schemes?: Scheme[];
     training?: TrainingResource[];
     market?: MarketResponse;
     opportunities?: MarketResponse;
+    pricing?: {
+      productName: string;
+      materialCost: number;
+      laborCost: number;
+      extraCost: number;
+      productionCost: number;
+      profitPercent: number;
+      suggestedPrice: number;
+    };
   };
 };
 
@@ -95,15 +120,36 @@ export const aiApi = {
     pending?: AiPending | null,
     imageSource?: string | null,
     imageContext?: Partial<ProductImageAnalysis> | null,
+    language: VoiceLanguage = "en",
   ) =>
     apiFetch<AiCommandResponse>("/ai/command", {
       method: "POST",
       body: JSON.stringify({
         text,
         pending: pending ?? null,
+        language,
         image: imageSource ? await prepareImage(imageSource) : undefined,
         imageContext: imageContext ?? undefined,
       }),
+    }),
+
+  transcribe: (audio: Blob, language: VoiceLanguage) =>
+    apiFetch<{ transcript: string }>(`/ai/speech-to-text?language=${language}`, {
+      method: "POST",
+      headers: { "Content-Type": audio.type || "audio/webm" },
+      body: audio,
+    }),
+
+  translate: (text: string, language: VoiceLanguage) =>
+    apiFetch<{ text: string }>("/ai/translate", {
+      method: "POST",
+      body: JSON.stringify({ text, language }),
+    }),
+
+  speak: (text: string, language: VoiceLanguage) =>
+    apiFetchBlob("/ai/speech", {
+      method: "POST",
+      body: JSON.stringify({ text, language }),
     }),
 
   analyzeImage: async (imageSource: string) =>

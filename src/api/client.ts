@@ -28,12 +28,17 @@ export class ApiError extends Error {
 }
 
 /** One place for fetch so no component ever calls the API directly. */
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function requestApi(path: string, init: RequestInit): Promise<Response> {
   const headers: Record<string, string> = {
     Accept: "application/json",
-    ...(init.body ? { "Content-Type": "application/json" } : {}),
     ...((init.headers as Record<string, string>) ?? {}),
   };
+  if (init.body && !headers["Content-Type"]) {
+    headers["Content-Type"] =
+      typeof Blob !== "undefined" && init.body instanceof Blob
+        ? init.body.type || "application/octet-stream"
+        : "application/json";
+  }
   if (!headers["Authorization"] && typeof window !== "undefined") {
     try {
       const stored = window.localStorage.getItem(AUTH_STORAGE_KEY);
@@ -51,16 +56,26 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     throw new ApiError("Cannot reach the H-Connect server. Is the backend running?", 0, "OFFLINE");
   }
 
-  const text = await response.text();
-  const payload = text ? safeJson(text) : null;
-
   if (!response.ok) {
+    const text = await response.text();
+    const payload = text ? safeJson(text) : null;
     const body = payload as { error?: string; code?: string } | null;
     const message = body?.error || "Something went wrong. Please try again.";
     throw new ApiError(message, response.status, body?.code ?? null);
   }
 
-  return payload as T;
+  return response;
+}
+
+export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await requestApi(path, init);
+  const text = await response.text();
+  return (text ? safeJson(text) : null) as T;
+}
+
+export async function apiFetchBlob(path: string, init: RequestInit = {}): Promise<Blob> {
+  const response = await requestApi(path, init);
+  return response.blob();
 }
 
 function safeJson(text: string): unknown {
@@ -74,7 +89,8 @@ function safeJson(text: string): unknown {
 const qs = (params: Record<string, string | number | undefined | null>) => {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null && `${value}`.trim() !== "") search.set(key, String(value));
+    if (value !== undefined && value !== null && `${value}`.trim() !== "")
+      search.set(key, String(value));
   }
   const query = search.toString();
   return query ? `?${query}` : "";
