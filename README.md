@@ -188,6 +188,21 @@ Google users who already have an assigned role keep that role when signing in.
 Admin access is not available through public Google onboarding; the existing
 admin account remains managed separately.
 
+## Deployment
+
+The frontend is configured for Vercel through Nitro. Import the GitHub
+repository with the repository root as the project root and `npm run build` as
+the build command. Do not set a static output directory; Nitro generates
+`.vercel/output` for Vercel.
+
+The Express API in `backend/` must be deployed separately. Set
+`VITE_API_URL` on Vercel to the deployed API origin ending in `/api`, and set
+`CORS_ORIGIN` on the API to the Vercel site URL. Configure
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` on Vercel. Keep the
+Supabase secret key and Sarvam/LLM credentials only in the backend environment.
+Add the deployed site's `/auth/callback` URL to Supabase's allowed redirect
+URLs.
+
 ## Environment variables
 
 | Variable                        | Purpose                                                            |
