@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { ArrowRight, Eye, EyeOff, ShieldCheck, ShoppingBag, Store } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, ShoppingBag, Store } from "lucide-react";
 
 import type { AccountRole } from "@/api/authApi";
 import { CraftBackdrop } from "@/components/AppShell";
@@ -20,10 +20,7 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
-const DEMO_ACCOUNTS = [
-  { role: "Merchant", email: "lakshmi@hconnect.app", icon: Store },
-  { role: "Admin", email: "admin@hconnect.app", icon: ShieldCheck },
-] as const;
+const DEMO_ACCOUNTS = [{ role: "Merchant", email: "lakshmi@hconnect.app", icon: Store }] as const;
 
 const ACCOUNT_ROLES: Array<{
   role: AccountRole;
@@ -123,7 +120,7 @@ function LoginPage() {
               Sign in to manage your craft business, discover handmade work, or administer the
               marketplace.
             </p>
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            <div className="mt-8 grid gap-3 sm:grid-cols-1">
               {DEMO_ACCOUNTS.map(({ role, icon: Icon }) => (
                 <div key={role} className="glass p-4">
                   <Icon className="size-5 text-clay" />
@@ -243,7 +240,7 @@ function LoginPage() {
 
             <div className="mt-7 border-t border-ink/10 pt-5">
               <p className="text-xs font-semibold uppercase tracking-[0.1em] text-ink/45">
-                Lakshmi merchant and admin · password: hconnect123
+                Merchant demo · password: hconnect123
               </p>
               <div className="mt-3 space-y-2">
                 {DEMO_ACCOUNTS.map(({ role, email: demoEmail, icon: Icon }) => (
