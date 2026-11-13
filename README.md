@@ -190,18 +190,17 @@ admin account remains managed separately.
 
 ## Deployment
 
-The frontend is configured for Vercel through Nitro. Import the GitHub
-repository with the repository root as the project root and `npm run build` as
-the build command. Do not set a static output directory; Nitro generates
-`.vercel/output` for Vercel.
+The root `vercel.json` configures the TanStack Start frontend and Express API as
+Vercel services. Requests under `/api/` go to the backend; all other paths go
+to the frontend. The frontend API client defaults to the same-origin `/api`
+path, so `VITE_API_URL` can be left unset for this setup. No service binding is
+needed: API calls are browser requests routed by the public rewrite, not
+server-to-server calls between Vercel services.
 
-The Express API in `backend/` must be deployed separately. Set
-`VITE_API_URL` on Vercel to the deployed API origin ending in `/api`, and set
-`CORS_ORIGIN` on the API to the Vercel site URL. Configure
-`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` on Vercel. Keep the
-Supabase secret key and Sarvam/LLM credentials only in the backend environment.
-Add the deployed site's `/auth/callback` URL to Supabase's allowed redirect
-URLs.
+Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` for the frontend.
+Set `CORS_ORIGIN` to the deployed site origin and keep the Supabase secret key
+and Sarvam/LLM credentials on the backend only. Add the deployed site's
+`/auth/callback` URL to Supabase's allowed redirect URLs.
 
 ## Environment variables
 
