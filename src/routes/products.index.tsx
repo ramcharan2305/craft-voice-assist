@@ -28,7 +28,6 @@ export const Route = createFileRoute("/products/")({
 
 const FILTERS = [
   { id: "all", label: "productsFilterAll" },
-  { id: "pending", label: "productsFilterPending" },
   { id: "changes_requested", label: "productsFilterChanges" },
   { id: "rejected", label: "productsFilterRejected" },
   { id: "listed", label: "productsFilterListed" },
@@ -45,12 +44,13 @@ function ProductsPage() {
   const visible =
     filter === "all"
       ? products
-      : ["pending", "changes_requested", "rejected"].includes(filter)
+      : ["changes_requested", "rejected"].includes(filter)
         ? products.filter((product) => (product.review_status ?? "approved") === filter)
         : filter === "listed"
           ? products.filter(
               (product) =>
-                product.status === "listed" && (product.review_status ?? "approved") === "approved",
+                product.status === "listed" &&
+                ["pending", "approved"].includes(product.review_status ?? "approved"),
             )
           : products.filter((product) => product.status === filter);
 

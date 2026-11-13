@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { requireSupabase } from "../db.js";
 import { requireArtisan } from "../middleware/auth.js";
+import { isRecordedSale } from "../services/mappers.js";
 
 const router = Router();
 
@@ -21,7 +22,10 @@ router.get("/", requireArtisan, async (req, res, next) => {
         .from("products")
         .select("id,status,review_status,quantity,price")
         .eq("artisan_id", artisanId),
-      supabase.from("orders").select("id,status,amount,quantity").eq("artisan_id", artisanId),
+      supabase
+        .from("orders")
+        .select("id,status,payment_status,amount,quantity")
+        .eq("artisan_id", artisanId),
     ]);
 
     if (products.error) throw products.error;
@@ -30,12 +34,12 @@ router.get("/", requireArtisan, async (req, res, next) => {
     const productRows = products.data ?? [];
     const orderRows = orders.data ?? [];
 
-    const sold = orderRows.filter((row) => row.status === "completed" || row.status === "shipped");
+    const sold = orderRows.filter(isRecordedSale);
 
     res.json({
       totalProducts: productRows.length,
       listedProducts: productRows.filter(
-        (row) => row.status === "listed" && row.review_status === "approved",
+        (row) => row.status === "listed" && ["pending", "approved"].includes(row.review_status),
       ).length,
       totalOrders: orderRows.length,
       pendingOrders: orderRows.filter((row) => row.status === "pending").length,

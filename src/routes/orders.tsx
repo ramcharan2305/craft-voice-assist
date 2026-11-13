@@ -36,9 +36,26 @@ const LABEL: Record<OrderStatus, string> = {
   cancelled: "Cancelled",
 };
 
+const PAYMENT_LABEL: Record<string, string> = {
+  pending: "Awaiting payment",
+  submitted: "Submitted",
+  verified: "Verified",
+  rejected: "Rejected",
+};
+
 function OrdersPage() {
-  const { openAssistant } = useStore();
+  const { openAssistant, refreshOrders, refreshDashboard } = useStore();
   const resource = useResource<Order[]>(() => orderApi.getOrders(), []);
+
+  const handlePaymentDecision = async (orderId: string, status: "verified" | "rejected") => {
+    try {
+      await orderApi.updatePaymentStatus(orderId, status);
+      await Promise.all([refreshOrders(), refreshDashboard()]);
+      resource.reload();
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   return (
     <AppShell>
@@ -78,6 +95,42 @@ function OrdersPage() {
                   <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-medium ${TONE[order.status]}`}>
                     {LABEL[order.status]}
                   </span>
+                  {order.payment_status !== "pending" || order.payment_screenshot || order.payment_utr ? (
+                    <div className="mt-4 rounded-2xl border border-black/5 bg-white/55 p-3 text-sm text-ink/70">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium">Payment</span>
+                        <span className="rounded-full bg-sage/12 px-2 py-1 text-xs font-medium text-sage">
+                          {PAYMENT_LABEL[order.payment_status] ?? "Awaiting payment"}
+                        </span>
+                      </div>
+                      {order.payment_utr ? <p className="mt-2">UTR: {order.payment_utr}</p> : null}
+                      {order.payment_screenshot ? (
+                        <img
+                          src={order.payment_screenshot}
+                          alt="Buyer payment screenshot"
+                          className="mt-3 h-28 w-28 rounded-xl border border-black/5 object-cover"
+                        />
+                      ) : null}
+                      {order.payment_status === "submitted" ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void handlePaymentDecision(order.id, "verified")}
+                            className="min-h-11 rounded-xl bg-sage px-3 text-sm font-semibold text-white"
+                          >
+                            Verify payment
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handlePaymentDecision(order.id, "rejected")}
+                            className="min-h-11 rounded-xl bg-destructive/10 px-3 text-sm font-semibold text-destructive"
+                          >
+                            Reject payment
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>

@@ -75,6 +75,13 @@ const DEMO_PROFILE: ArtisanProfile = {
   location: DEMO_ARTISAN.location,
   craft_type: "Handloom Sarees",
   experience_years: 10,
+  age: null,
+  gender: "",
+  state: "",
+  district: "",
+  city: "",
+  product_category: "",
+  business_size: "",
   is_demo: true,
 };
 
@@ -339,7 +346,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const sales: Sale[] = useMemo(
     () =>
       orders
-        .filter((order) => order.status === "completed" || order.status === "shipped")
+        .filter(
+          (order) =>
+            order.status !== "cancelled" &&
+            (order.payment_status === "verified" ||
+              order.status === "completed" ||
+              order.status === "shipped"),
+        )
         .map((order) => ({
           id: order.id,
           product: order.product_name,

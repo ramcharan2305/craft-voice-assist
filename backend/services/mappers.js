@@ -41,8 +41,21 @@ export function toOrder(row, productName) {
     quantity: Number(row.quantity ?? 0),
     amount: Number(row.amount ?? 0),
     status: row.status ?? "pending",
+    payment_status: row.payment_status ?? "pending",
+    payment_utr: row.payment_utr ?? "",
+    payment_screenshot: row.payment_screenshot ?? "",
+    merchant_qr_url: row.merchant_qr_url ?? row.artisans?.payment_qr_url ?? "",
     created_at: row.created_at,
   };
+}
+
+export function isRecordedSale(order) {
+  return (
+    order.status !== "cancelled" &&
+    (order.payment_status === "verified" ||
+      order.status === "completed" ||
+      order.status === "shipped")
+  );
 }
 
 export function toArtisan(row) {
@@ -55,8 +68,16 @@ export function toArtisan(row) {
     location: row.location ?? "",
     craft_type: row.craft_type ?? "",
     experience_years: Number(row.experience_years ?? 0),
+    age: row.age === null || row.age === undefined ? "" : Number(row.age),
+    gender: row.gender ?? "",
+    state: row.state ?? "",
+    district: row.district ?? "",
+    city: row.city ?? "",
+    product_category: row.product_category ?? "",
+    business_size: row.business_size ?? "",
     verification_status: row.verification_status ?? "pending",
     verification_feedback: row.verification_feedback ?? "",
+    payment_qr_url: row.payment_qr_url ?? "",
     is_demo: Boolean(row.is_demo),
   };
 }

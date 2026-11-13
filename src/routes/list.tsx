@@ -90,9 +90,7 @@ function ListProductPage() {
     setFailure(null);
     try {
       const created = await addProduct({ ...draft, price });
-      say(
-        `${created.name} was submitted for approval. It will appear in the buyer catalogue after review.`,
-      );
+      say(`${created.name} is listed and now available in the buyer catalogue.`);
       resetDraft();
       void refreshProducts();
       navigate({ to: "/products" });

@@ -29,7 +29,35 @@ const STATUS_LABEL: Record<BuyerRequest["status"], string> = {
   in_progress: "In progress",
   responded: "Response received",
   closed: "Closed",
+  pending: "Awaiting payment",
+  completed: "Purchased",
 };
+
+const PAYMENT_STATUS_LABEL: Record<NonNullable<BuyerRequest["payment_status"]>, string> = {
+  pending: "Payment required",
+  submitted: "Awaiting artisan review",
+  verified: "Payment verified",
+  rejected: "Payment rejected — resubmit",
+};
+
+type PaymentDraft = {
+  utr: string;
+  screenshot: string;
+  screenshotName: string;
+};
+
+function readImageAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Unable to read the payment screenshot."));
+    };
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Unable to read the payment screenshot."));
+    reader.readAsDataURL(file);
+  });
+}
 
 function BuyerPage() {
   const [query, setQuery] = useState("");
@@ -48,6 +76,8 @@ function BuyerPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const [paymentDrafts, setPaymentDrafts] = useState<Record<string, PaymentDraft>>({});
+  const [paymentSaving, setPaymentSaving] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -124,27 +154,126 @@ function BuyerPage() {
 
   const submitRequest = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSaving(true);
     setFailure(null);
+    if ((requestType === "question" || serviceRequestOpen) && !note.trim()) {
+      setFailure("Please enter a message before sending your enquiry.");
+      return;
+    }
+    if (serviceRequestOpen && !artisanId) {
+      setFailure("Choose an artisan before sending your service request.");
+      return;
+    }
+    if (
+      selectedProduct &&
+      requestType === "purchase" &&
+      (!Number.isInteger(quantity) || quantity < 1 || quantity > selectedProduct.quantity)
+    ) {
+      setFailure("Enter a valid quantity before placing your order.");
+      return;
+    }
+    setSaving(true);
     try {
-      const created = await buyerApi.createRequest(
-        selectedProduct
-          ? { product_id: selectedProduct.id, request_type: requestType, quantity, message: note }
-          : {
-              artisan_id: artisanId,
-              request_type: "service",
-              quantity: 1,
-              message: `${serviceType}: ${note.trim()}`,
-            },
-      );
+      const created =
+        selectedProduct && requestType === "purchase"
+          ? await buyerApi.purchaseProduct({ product_id: selectedProduct.id, quantity })
+          : await buyerApi.createRequest(
+              selectedProduct
+                ? {
+                    product_id: selectedProduct.id,
+                    request_type: "question",
+                    quantity,
+                    message: note,
+                  }
+                : {
+                    artisan_id: artisanId,
+                    request_type: "service",
+                    quantity: 1,
+                    message: `${serviceType}: ${note.trim()}`,
+                  },
+            );
       setRequests((current) => [created, ...current]);
+      if (selectedProduct && requestType === "purchase") {
+        setProducts((current) =>
+          current.flatMap((product) => {
+            if (product.id !== selectedProduct.id) return [product];
+            const remaining = product.quantity - quantity;
+            return remaining > 0
+              ? [
+                  {
+                    ...product,
+                    quantity: remaining,
+                    availability: `${remaining} piece${remaining === 1 ? "" : "s"} ready`,
+                  },
+                ]
+              : [];
+          }),
+        );
+      }
       setSelectedProduct(null);
       setServiceRequestOpen(false);
       setShowRequests(true);
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : "Unable to send your request.");
+      setFailure(error instanceof Error ? error.message : "Unable to complete that action.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const setPaymentScreenshot = async (orderId: string, file: File | undefined) => {
+    if (!file) return;
+    setFailure(null);
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setFailure("Upload a PNG, JPG or WebP payment screenshot.");
+      return;
+    }
+    if (file.size > 1_400_000) {
+      setFailure("Keep the payment screenshot under 1.4 MB.");
+      return;
+    }
+    try {
+      const screenshot = await readImageAsDataUrl(file);
+      setPaymentDrafts((current) => ({
+        ...current,
+        [orderId]: {
+          ...(current[orderId] ?? { utr: "", screenshot: "", screenshotName: "" }),
+          screenshot,
+          screenshotName: file.name,
+        },
+      }));
+    } catch (error) {
+      setFailure(error instanceof Error ? error.message : "Unable to read the payment screenshot.");
+    }
+  };
+
+  const submitPayment = async (event: FormEvent<HTMLFormElement>, request: BuyerRequest) => {
+    event.preventDefault();
+    setFailure(null);
+    const draft = paymentDrafts[request.id] ?? { utr: "", screenshot: "", screenshotName: "" };
+    const utr = draft.utr.trim();
+    if (!/^[A-Za-z0-9]{6,}$/.test(utr)) {
+      setFailure("Enter a valid UTR or UPI transaction ID with at least 6 letters or numbers.");
+      return;
+    }
+    if (!draft.screenshot) {
+      setFailure("Upload a payment screenshot before submitting.");
+      return;
+    }
+
+    setPaymentSaving(request.id);
+    try {
+      const updated = await buyerApi.submitPayment(request.id, {
+        utr,
+        screenshot: draft.screenshot,
+      });
+      setRequests((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setPaymentDrafts((current) => ({
+        ...current,
+        [request.id]: { utr: "", screenshot: "", screenshotName: "" },
+      }));
+    } catch (error) {
+      setFailure(error instanceof Error ? error.message : "Unable to submit payment details.");
+    } finally {
+      setPaymentSaving(null);
     }
   };
 
@@ -159,21 +288,20 @@ function BuyerPage() {
           </p>
           <h1 className="mt-2 text-4xl">Find something meaningful.</h1>
           <p className="mt-2 max-w-xl text-base text-ink/60">
-            Discover approved crafts and send purchase, question, or service requests directly to
-            artisans.
+            Buy listed crafts directly, or send questions and service requests to artisans.
           </p>
         </div>
         <button
           onClick={() => setShowRequests((visible) => !visible)}
           className="chip flex min-h-12 items-center gap-2 px-4 font-medium text-ink"
         >
-          My requests{" "}
+          My purchases & requests{" "}
           <span className="grid size-6 place-items-center rounded-full bg-clay/12 text-xs text-clay">
             {requests.length}
           </span>
         </button>
       </header>
-      {failure ? (
+      {failure && !modalOpen ? (
         <div
           role="alert"
           className="mt-5 rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive"
@@ -216,9 +344,11 @@ function BuyerPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 id="requests-heading" className="text-2xl">
-                My requests
+                My purchases & requests
               </h2>
-              <p className="mt-1 text-sm text-ink/55">Your requests and their latest status.</p>
+              <p className="mt-1 text-sm text-ink/55">
+                Your purchases and requests, with their latest status.
+              </p>
             </div>
             <button
               onClick={() => setShowRequests(false)}
@@ -230,42 +360,147 @@ function BuyerPage() {
           {requests.length ? (
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {requests.map((request) => (
-                <article key={request.id} className="glass flex gap-4 p-4">
-                  {request.product_image ? (
-                    <img
-                      src={request.product_image}
-                      alt=""
-                      className="size-20 shrink-0 rounded-2xl object-cover"
-                    />
-                  ) : (
-                    <span className="grid size-20 shrink-0 place-items-center rounded-2xl bg-sage/15 text-sage">
-                      <Scissors className="size-7" />
-                    </span>
-                  )}
-                  <div className="min-w-0">
-                    <h3 className="font-semibold">{request.product_name}</h3>
-                    <p className="mt-1 text-sm text-ink/55">
-                      {request.request_type === "service"
-                        ? "Service request"
-                        : `${request.request_type === "purchase" ? "Purchase request" : "Product question"} · ${request.quantity} piece${request.quantity === 1 ? "" : "s"}`}
-                    </p>
-                    <p className="mt-1 text-sm text-ink/55">
-                      Artisan: {request.artisan_name || "Assigned artisan"}
-                    </p>
-                    {request.message ? (
-                      <p className="mt-1 break-words text-sm text-ink/55">{request.message}</p>
-                    ) : null}
-                    <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-sage/15 px-2.5 py-1 text-xs font-medium text-sage">
-                      <Check className="size-3.5" /> {STATUS_LABEL[request.status]}
-                    </span>
+                <article key={request.id} className="glass p-4">
+                  <div className="flex gap-4">
+                    {request.product_image ? (
+                      <img
+                        src={request.product_image}
+                        alt=""
+                        className="size-20 shrink-0 rounded-2xl object-cover"
+                      />
+                    ) : (
+                      <span className="grid size-20 shrink-0 place-items-center rounded-2xl bg-sage/15 text-sage">
+                        <Scissors className="size-7" />
+                      </span>
+                    )}
+                    <div className="min-w-0">
+                      <h3 className="font-semibold">{request.product_name}</h3>
+                      <p className="mt-1 text-sm text-ink/55">
+                        {request.request_type === "purchase"
+                          ? `${request.status === "completed" ? "Purchased" : "Order"} · ${request.quantity} piece${request.quantity === 1 ? "" : "s"}`
+                          : request.request_type === "service"
+                            ? "Service request"
+                            : `Product question · ${request.quantity} piece${request.quantity === 1 ? "" : "s"}`}
+                      </p>
+                      {request.amount !== undefined ? (
+                        <p className="mt-1 text-sm font-medium text-clay">
+                          Total: {rupees(request.amount)}
+                        </p>
+                      ) : null}
+                      <p className="mt-1 text-sm text-ink/55">
+                        Artisan: {request.artisan_name || "Assigned artisan"}
+                      </p>
+                      {request.message ? (
+                        <p className="mt-1 break-words text-sm text-ink/55">{request.message}</p>
+                      ) : null}
+                      <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-sage/15 px-2.5 py-1 text-xs font-medium text-sage">
+                        <Check className="size-3.5" /> {STATUS_LABEL[request.status]}
+                      </span>
+                    </div>
                   </div>
+                  {request.request_type === "purchase" ? (
+                    <div className="mt-4 border-t border-ink/10 pt-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="font-semibold">Pay the artisan</h4>
+                        <span className="rounded-full bg-clay/10 px-2.5 py-1 text-xs text-clay">
+                          {PAYMENT_STATUS_LABEL[request.payment_status ?? "pending"]}
+                        </span>
+                      </div>
+                      {request.merchant_qr_url ? (
+                        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                          <img
+                            src={request.merchant_qr_url}
+                            alt={`${request.artisan_name || "Artisan"} payment QR code`}
+                            className="size-40 rounded-xl border border-ink/10 bg-white object-contain p-2"
+                          />
+                          <p className="text-sm text-ink/65">
+                            Scan this QR code to pay{" "}
+                            {request.amount !== undefined
+                              ? rupees(request.amount)
+                              : "the order total"}
+                            , then submit your UTR and payment screenshot.
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-sm text-destructive">
+                          This artisan has not uploaded a payment QR code yet. Contact the artisan
+                          before paying.
+                        </p>
+                      )}
+                      {request.payment_status === "submitted" ? (
+                        <p className="mt-3 text-sm text-ink/65">
+                          Your payment details were sent to the artisan for verification.
+                        </p>
+                      ) : request.payment_status === "verified" ? (
+                        <p className="mt-3 text-sm text-sage">
+                          Payment verified. Your order is confirmed.
+                        </p>
+                      ) : request.merchant_qr_url ? (
+                        <form
+                          onSubmit={(event) => void submitPayment(event, request)}
+                          className="mt-4 grid gap-3 sm:grid-cols-2"
+                        >
+                          <label className="text-sm font-medium text-ink/70">
+                            UTR or UPI transaction ID
+                            <input
+                              required
+                              minLength={6}
+                              maxLength={120}
+                              pattern="[A-Za-z0-9]{6,}"
+                              value={paymentDrafts[request.id]?.utr ?? request.payment_utr ?? ""}
+                              onChange={(event) =>
+                                setPaymentDrafts((current) => ({
+                                  ...current,
+                                  [request.id]: {
+                                    ...(current[request.id] ?? {
+                                      utr: "",
+                                      screenshot: "",
+                                      screenshotName: "",
+                                    }),
+                                    utr: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="mt-1 min-h-11 w-full rounded-xl border border-ink/10 bg-white/70 px-3"
+                            />
+                          </label>
+                          <label className="text-sm font-medium text-ink/70">
+                            Payment screenshot (PNG, JPG or WebP; up to 1.4 MB)
+                            <input
+                              required
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp"
+                              onChange={(event) =>
+                                void setPaymentScreenshot(request.id, event.target.files?.[0])
+                              }
+                              className="mt-1 block min-h-11 w-full rounded-xl border border-ink/10 bg-white/70 p-2 text-xs"
+                            />
+                            {paymentDrafts[request.id]?.screenshotName ? (
+                              <span className="mt-1 block text-xs text-ink/55">
+                                {paymentDrafts[request.id].screenshotName}
+                              </span>
+                            ) : null}
+                          </label>
+                          <button
+                            type="submit"
+                            disabled={paymentSaving === request.id}
+                            className="min-h-11 rounded-xl bg-clay px-4 text-sm font-semibold text-white disabled:opacity-60 sm:col-span-2"
+                          >
+                            {paymentSaving === request.id
+                              ? "Submitting…"
+                              : "Submit payment for review"}
+                          </button>
+                        </form>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>
           ) : (
             <div className="glass mt-5 p-8 text-center">
-              <h3 className="text-xl">No requests yet</h3>
-              <p className="mt-2 text-sm text-ink/55">Choose a craft and contact its artisan.</p>
+              <h3 className="text-xl">No purchases or requests yet</h3>
+              <p className="mt-2 text-sm text-ink/55">Buy a craft or contact its artisan.</p>
             </div>
           )}
         </section>
@@ -306,7 +541,7 @@ function BuyerPage() {
                   The craft collection
                 </h2>
                 <p className="mt-1 text-sm text-ink/55">
-                  {visibleProducts.length} approved product{visibleProducts.length === 1 ? "" : "s"}
+                  {visibleProducts.length} listed product{visibleProducts.length === 1 ? "" : "s"}
                 </p>
               </div>
               <p className="hidden text-sm text-ink/50 sm:block">
@@ -315,7 +550,7 @@ function BuyerPage() {
             </div>
             {loading ? (
               <p className="mt-5 text-sm text-ink/55" aria-live="polite">
-                Loading approved crafts…
+                Loading listed crafts…
               </p>
             ) : null}
             {!loading && visibleProducts.length ? (
@@ -373,12 +608,12 @@ function BuyerPage() {
             {!loading && visibleProducts.length === 0 ? (
               <div className="glass mt-5 p-8 text-center">
                 <h3 className="text-xl">
-                  {products.length ? "No crafts found" : "No approved products yet"}
+                  {products.length ? "No crafts found" : "No listed products yet"}
                 </h3>
                 <p className="mt-2 text-sm text-ink/55">
                   {products.length
                     ? "Try another search or category."
-                    : "Products appear here after an administrator approves them."}
+                    : "Products appear here as soon as artisans list them."}
                 </p>
               </div>
             ) : null}
@@ -400,7 +635,7 @@ function BuyerPage() {
                   {serviceRequestOpen
                     ? "Request an artisan service"
                     : requestType === "purchase"
-                      ? "Send purchase request"
+                      ? "Buy this product"
                       : "Ask this artisan"}
                 </p>
                 <h2 id="request-title" className="mt-1 text-2xl">
@@ -423,7 +658,19 @@ function BuyerPage() {
                 <X className="size-5" />
               </button>
             </div>
-            <form onSubmit={(event) => void submitRequest(event)} className="mt-5 space-y-4">
+            <form
+              noValidate
+              onSubmit={(event) => void submitRequest(event)}
+              className="mt-5 space-y-4"
+            >
+              {failure ? (
+                <p
+                  role="alert"
+                  className="rounded-xl border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive"
+                >
+                  {failure}
+                </p>
+              ) : null}
               {serviceRequestOpen ? (
                 <>
                   <label className="block text-sm font-medium">
@@ -469,27 +716,30 @@ function BuyerPage() {
                   />
                 </label>
               ) : null}
-              <label className="block text-sm font-medium">
-                {requestType === "question" || serviceRequestOpen
-                  ? "Your message"
-                  : "Add a note (optional)"}
-                <textarea
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  required={requestType === "question" || serviceRequestOpen}
-                  maxLength={2000}
-                  placeholder={
-                    serviceRequestOpen
-                      ? "Share size, materials, timing, or other details…"
-                      : "Ask a question or share what you need…"
-                  }
-                  rows={3}
-                  className="mt-2 w-full resize-y rounded-xl border border-ink/10 bg-white/60 p-3 text-base outline-none focus:ring-2 focus:ring-clay/35"
-                />
-              </label>
+              {requestType !== "purchase" || serviceRequestOpen ? (
+                <label className="block text-sm font-medium">
+                  {requestType === "question" || serviceRequestOpen
+                    ? "Your message"
+                    : "Add a note (optional)"}
+                  <textarea
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                    required={requestType === "question" || serviceRequestOpen}
+                    maxLength={2000}
+                    placeholder={
+                      serviceRequestOpen
+                        ? "Share size, materials, timing, or other details…"
+                        : "Ask a question or share what you need…"
+                    }
+                    rows={3}
+                    className="mt-2 w-full resize-y rounded-xl border border-ink/10 bg-white/60 p-3 text-base outline-none focus:ring-2 focus:ring-clay/35"
+                  />
+                </label>
+              ) : null}
               <p className="text-xs text-ink/50">
-                This goes directly to the artisan. Admin only reviews artisan accounts and product
-                listings; no payment is taken here.
+                {requestType === "purchase" && !serviceRequestOpen
+                  ? "After placing your order, scan the artisan's QR code and submit your payment details."
+                  : "Questions and service requests go directly to the artisan."}
               </p>
               <button
                 type="submit"
@@ -497,11 +747,13 @@ function BuyerPage() {
                 className="min-h-12 w-full rounded-xl bg-clay px-5 font-semibold text-white disabled:opacity-60"
               >
                 {saving
-                  ? "Sending…"
+                  ? requestType === "purchase" && !serviceRequestOpen
+                    ? "Processing…"
+                    : "Sending…"
                   : serviceRequestOpen
                     ? "Send service request"
                     : requestType === "purchase"
-                      ? "Send purchase request"
+                      ? "Buy now"
                       : "Send question"}
               </button>
             </form>

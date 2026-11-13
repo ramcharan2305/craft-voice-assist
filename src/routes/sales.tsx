@@ -38,7 +38,7 @@ function SalesPage() {
     <AppShell>
       <h1 className="text-3xl">Your business at a glance.</h1>
       <p className="mt-2 text-base text-ink/60">
-        Completed and shipped order records; H-Connect does not track payment collection.
+        Orders with verified payments, plus shipped or completed orders.
       </p>
 
       <button
@@ -59,7 +59,7 @@ function SalesPage() {
                   : products.filter((p) => p.status === "listed").length,
               ),
             },
-            { label: "Completed / shipped orders", value: String(sales.length) },
+            { label: "Verified / shipped / completed orders", value: String(sales.length) },
             { label: "Recorded order value", value: rupees(total) },
             { label: "Buyers interested", value: String(interest) },
           ]}
@@ -70,8 +70,8 @@ function SalesPage() {
         <h2 className="text-lg">What you sold</h2>
         {sales.length === 0 ? (
           <p className="mt-4 text-base text-ink/60">
-            No completed or shipped orders are recorded yet. Pending orders are available on the
-            Orders page.
+            No verified, shipped, or completed orders are recorded yet. Pending orders are available
+            on the Orders page.
           </p>
         ) : (
           <div className="mt-4 space-y-3">

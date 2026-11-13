@@ -11,13 +11,11 @@ const STATUS = {
 
 export function ProductCard({ product }: { product: Product }) {
   const status =
-    product.review_status === "pending"
-      ? { text: "Awaiting approval", Icon: Circle, tone: "bg-clay/12 text-clay" }
-      : product.review_status === "changes_requested"
-        ? { text: "Corrections requested", Icon: Circle, tone: "bg-clay/12 text-clay" }
-        : product.review_status === "rejected"
-          ? { text: "Not approved", Icon: Circle, tone: "bg-destructive/12 text-destructive" }
-          : STATUS[product.status];
+    product.review_status === "changes_requested"
+      ? { text: "Corrections requested", Icon: Circle, tone: "bg-clay/12 text-clay" }
+      : product.review_status === "rejected"
+        ? { text: "Not approved", Icon: Circle, tone: "bg-destructive/12 text-destructive" }
+        : STATUS[product.status];
   return (
     <Link
       to="/products/$id"

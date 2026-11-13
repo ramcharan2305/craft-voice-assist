@@ -2,14 +2,24 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   BadgeCheck,
+  CalendarClock,
   CircleAlert,
+  ExternalLink,
+  Globe2,
   PackageCheck,
   RefreshCw,
   ShieldCheck,
   Trash2,
   Users,
 } from "lucide-react";
-import { adminApi, type AdminArtisan, type AdminSummary, type ReviewAction } from "@/api/adminApi";
+import {
+  adminApi,
+  type AdminArtisan,
+  type AdminOpportunity,
+  type AdminSummary,
+  type ReviewAction,
+} from "@/api/adminApi";
+import type { CrawlRun } from "@/api/opportunityApi";
 import type { Product } from "@/lib/mock-data";
 import { AppShell } from "@/components/AppShell";
 import { ConfirmationModal } from "@/components/ConfirmationModal";
@@ -38,11 +48,15 @@ function AdminPage() {
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [artisans, setArtisans] = useState<AdminArtisan[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [opportunities, setOpportunities] = useState<AdminOpportunity[]>([]);
+  const [crawlStatus, setCrawlStatus] = useState<CrawlRun | null>(null);
   const [feedback, setFeedback] = useState<Record<string, string>>({});
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [opportunityToDelete, setOpportunityToDelete] = useState<AdminOpportunity | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [opportunityFailure, setOpportunityFailure] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -56,6 +70,19 @@ function AdminPage() {
       setSummary(nextSummary);
       setArtisans(nextArtisans);
       setProducts(nextProducts);
+      try {
+        const [nextOpportunities, nextCrawlStatus] = await Promise.all([
+          adminApi.getOpportunities(),
+          adminApi.getOpportunityCrawlStatus(),
+        ]);
+        setOpportunities(nextOpportunities);
+        setCrawlStatus(nextCrawlStatus);
+        setOpportunityFailure(null);
+      } catch (error) {
+        setOpportunityFailure(
+          error instanceof Error ? error.message : "Unable to load opportunity records.",
+        );
+      }
     } catch (error) {
       setFailure(error instanceof Error ? error.message : "Unable to load the admin workspace.");
     } finally {
@@ -66,6 +93,45 @@ function AdminPage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (crawlStatus?.status !== "running") return;
+
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const latest = await adminApi.getOpportunityCrawlStatus();
+        if (!active) return;
+        if (latest && latest.status !== "running") {
+          const nextOpportunities = await adminApi.getOpportunities();
+          if (!active) return;
+          setCrawlStatus(latest);
+          setOpportunityFailure(
+            latest.status === "failed"
+              ? (latest.errors[0]?.message ?? "The opportunity crawl failed.")
+              : null,
+          );
+          setOpportunities(nextOpportunities);
+        } else {
+          if (latest) setCrawlStatus(latest);
+          timer = setTimeout(() => void poll(), 2000);
+        }
+      } catch (error) {
+        if (!active) return;
+        setOpportunityFailure(
+          error instanceof Error ? error.message : "Unable to check crawl progress.",
+        );
+        timer = setTimeout(() => void poll(), 5000);
+      }
+    };
+
+    timer = setTimeout(() => void poll(), 2000);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [crawlStatus?.status]);
 
   const reviewArtisan = async (artisan: AdminArtisan, action: ReviewAction) => {
     const note = feedback[artisan.id]?.trim() ?? "";
@@ -117,6 +183,56 @@ function AdminPage() {
       await refresh();
     } catch (error) {
       setFailure(error instanceof Error ? error.message : "Unable to remove this product.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const crawlOpportunities = async () => {
+    setBusy("opportunity-crawl");
+    setOpportunityFailure(null);
+    try {
+      const run = await adminApi.crawlOpportunities();
+      setCrawlStatus(run);
+      say("Opportunity crawl started. Progress will update here.");
+    } catch (error) {
+      setOpportunityFailure(
+        error instanceof Error ? error.message : "Unable to crawl trusted sources.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const reviewOpportunity = async (
+    opportunity: AdminOpportunity,
+    status: "approved" | "rejected",
+  ) => {
+    setBusy(opportunity.id);
+    setOpportunityFailure(null);
+    try {
+      await adminApi.reviewOpportunity(opportunity.id, status);
+      await refresh();
+    } catch (error) {
+      setOpportunityFailure(
+        error instanceof Error ? error.message : "Unable to update opportunity review.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const deleteOpportunity = async (opportunity: AdminOpportunity) => {
+    setBusy(opportunity.id);
+    setOpportunityFailure(null);
+    try {
+      await adminApi.deleteOpportunity(opportunity.id);
+      setOpportunityToDelete(null);
+      await refresh();
+    } catch (error) {
+      setOpportunityFailure(
+        error instanceof Error ? error.message : "Unable to remove this opportunity.",
+      );
     } finally {
       setBusy(null);
     }
@@ -185,6 +301,7 @@ function AdminPage() {
 
       <section className="mt-9" aria-labelledby="artisan-review-heading">
         <SectionHeading
+          headingId="artisan-review-heading"
           icon={Users}
           eyebrow="Onboarding"
           title="Artisan verification"
@@ -233,6 +350,7 @@ function AdminPage() {
 
       <section className="mt-9" aria-labelledby="product-review-heading">
         <SectionHeading
+          headingId="product-review-heading"
           icon={PackageCheck}
           eyebrow="Marketplace quality"
           title="Product reviews and listings"
@@ -302,6 +420,197 @@ function AdminPage() {
           ))}
         </div>
       </section>
+      <section className="mt-10" aria-labelledby="opportunity-review-heading">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <SectionHeading
+            headingId="opportunity-review-heading"
+            icon={Globe2}
+            eyebrow="Crawled opportunities"
+            title="Opportunity review"
+            count={opportunities.length}
+          />
+          <button
+            type="button"
+            onClick={() => void crawlOpportunities()}
+            disabled={busy === "opportunity-crawl" || crawlStatus?.status === "running"}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-clay px-4 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            <RefreshCw className={`size-4 ${busy === "opportunity-crawl" ? "animate-spin" : ""}`} />
+            {busy === "opportunity-crawl" ? "Crawling…" : "Crawl trusted sources"}
+          </button>
+        </div>
+        {crawlStatus ? (
+          <>
+            <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink/55">
+              <CalendarClock className="size-4" />
+              Last crawl:{" "}
+              {crawlStatus.completed_at
+                ? new Date(crawlStatus.completed_at).toLocaleString()
+                : new Date(crawlStatus.started_at).toLocaleString()}
+              · {crawlStatus.status} · {crawlStatus.records_found} found ·{" "}
+              {crawlStatus.records_added} new
+            </p>
+            {crawlStatus.errors.length ? (
+              <ul className="mt-2 space-y-1 text-xs text-destructive">
+                {crawlStatus.errors.map((crawlError, index) => (
+                  <li key={`${crawlError.source ?? "crawler"}-${index}`}>
+                    {crawlError.source ? `${crawlError.source}: ` : ""}
+                    {crawlError.message}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </>
+        ) : null}
+        {opportunityFailure ? (
+          <p role="alert" className="mt-4 rounded-xl bg-destructive/5 p-3 text-sm text-destructive">
+            {opportunityFailure}
+          </p>
+        ) : null}
+        {opportunities.length === 0 && !opportunityFailure ? (
+          <EmptyState>
+            No crawled opportunities yet. Run a crawl to check the trusted sources.
+          </EmptyState>
+        ) : null}
+        <div className="mt-4 space-y-3">
+          {opportunities.map((opportunity) => (
+            <article key={opportunity.id} className="glass p-4 sm:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">{opportunity.title}</h3>
+                  <p className="mt-1 text-xs text-ink/50">
+                    {opportunity.source_name} · Checked{" "}
+                    {new Date(opportunity.last_checked_at).toLocaleString()}
+                  </p>
+                </div>
+                <ReviewBadge status={opportunity.review_status} />
+              </div>
+              <p className="mt-3 text-sm text-ink/65">
+                {opportunity.description || "No description found in the source page."}
+              </p>
+              <p className="mt-2 text-sm text-ink/55">
+                {opportunity.provider || "Provider not identified"} · {opportunity.category}
+              </p>
+              <p className="mt-2 text-sm text-ink/55">
+                {[
+                  opportunity.location,
+                  opportunity.business_category,
+                  opportunity.product_category,
+                  opportunity.opportunity_type,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "Location and category not specified"}
+              </p>
+              <p className="mt-2 text-sm text-ink/55">
+                Audience: {opportunity.target_audience || "Not specified"} · Starts:{" "}
+                {opportunity.start_date || "Not specified"}
+              </p>
+              <p className="mt-2 text-sm text-ink/55">
+                Status: {opportunity.status} · Eligibility:{" "}
+                {opportunity.eligibility_requirements || "Not identified in source"} · Deadline:{" "}
+                {opportunity.deadline || "Not specified"}
+              </p>
+              <p className="mt-2 text-sm text-ink/55">
+                Explicit criteria: age{" "}
+                {opportunity.age_min !== null || opportunity.age_max !== null
+                  ? `${opportunity.age_min ?? "no minimum"}–${opportunity.age_max ?? "no maximum"}`
+                  : "not specified"}
+                {opportunity.gender_eligibility && opportunity.gender_eligibility !== "any"
+                  ? ` · Gender: ${opportunity.gender_eligibility}`
+                  : ""}
+                {opportunity.experience_min !== null
+                  ? ` · Experience: ${opportunity.experience_min}+ years`
+                  : ""}
+              </p>
+              <p className="mt-2 text-sm text-ink/55">
+                Benefits: {opportunity.benefits || "Not specified"}
+                {opportunity.fees ? ` · Fees: ${opportunity.fees}` : ""}
+              </p>
+              <p className="mt-2 text-sm text-ink/55">
+                Application procedure: {opportunity.application_procedure || "Not specified"}
+              </p>
+              {opportunity.category === "COURSE_OR_TRAINING" ? (
+                <p className="mt-2 text-sm text-ink/55">
+                  Duration: {opportunity.duration || "Not specified"} · Delivery:{" "}
+                  {opportunity.delivery_mode || "Not specified"} · Certification:{" "}
+                  {opportunity.certification || "Not specified"}
+                </p>
+              ) : null}
+              {opportunity.category === "MARKET_LINKAGE" ? (
+                <p className="mt-2 text-sm text-ink/55">
+                  Event: {opportunity.event_date || "Not specified"} · Venue:{" "}
+                  {opportunity.venue || "Not specified"} · Products:{" "}
+                  {opportunity.accepted_products || "Not specified"} · Buyers:{" "}
+                  {opportunity.buyer_details || "Not specified"}
+                </p>
+              ) : null}
+              <p className="mt-2 text-xs text-ink/50">
+                Last crawled: {new Date(opportunity.last_crawled_at).toLocaleString()}
+                {opportunity.last_verified_at
+                  ? ` · Last verified: ${new Date(opportunity.last_verified_at).toLocaleString()}`
+                  : ""}
+              </p>
+              <a
+                href={opportunity.source_url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-clay"
+              >
+                Review original source <ExternalLink className="size-3.5" />
+              </a>
+              {opportunity.source_urls
+                .filter((url) => url !== opportunity.source_url)
+                .map((url) => (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ml-4 mt-2 inline-flex items-center gap-1 text-sm font-medium text-clay"
+                  >
+                    Alternate source <ExternalLink className="size-3.5" />
+                  </a>
+                ))}
+              {opportunity.application_url ? (
+                <a
+                  href={opportunity.application_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ml-4 mt-2 inline-flex items-center gap-1 text-sm font-medium text-clay"
+                >
+                  Application link <ExternalLink className="size-3.5" />
+                </a>
+              ) : null}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={busy === opportunity.id || opportunity.review_status === "approved"}
+                  onClick={() => void reviewOpportunity(opportunity, "approved")}
+                  className="min-h-10 rounded-xl bg-sage px-3 text-sm font-semibold text-white disabled:opacity-45"
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  disabled={busy === opportunity.id || opportunity.review_status === "rejected"}
+                  onClick={() => void reviewOpportunity(opportunity, "rejected")}
+                  className="chip min-h-10 px-3 text-sm font-semibold text-ink/70 disabled:opacity-45"
+                >
+                  Reject
+                </button>
+                <button
+                  type="button"
+                  disabled={busy === opportunity.id}
+                  onClick={() => setOpportunityToDelete(opportunity)}
+                  className="chip inline-flex min-h-10 items-center gap-2 px-3 text-sm font-semibold text-destructive disabled:opacity-50"
+                >
+                  <Trash2 className="size-4" /> Remove
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
       <ConfirmationModal
         open={productToDelete !== null}
         danger
@@ -312,6 +621,17 @@ function AdminPage() {
           if (productToDelete) void deleteProduct(productToDelete);
         }}
         onCancel={() => setProductToDelete(null)}
+      />
+      <ConfirmationModal
+        open={opportunityToDelete !== null}
+        danger
+        title={`Remove ${opportunityToDelete?.title ?? "this opportunity"}?`}
+        detail="This removes the opportunity from recommendations and keeps its crawl history marked as removed."
+        confirmLabel={busy === opportunityToDelete?.id ? "Removing…" : "Yes, remove opportunity"}
+        onConfirm={() => {
+          if (opportunityToDelete) void deleteOpportunity(opportunityToDelete);
+        }}
+        onCancel={() => setOpportunityToDelete(null)}
       />
     </AppShell>
   );
@@ -341,11 +661,13 @@ function MetricCard({
 }
 
 function SectionHeading({
+  headingId,
   icon: Icon,
   eyebrow,
   title,
   count,
 }: {
+  headingId?: string;
   icon: typeof Users;
   eyebrow: string;
   title: string;
@@ -358,7 +680,9 @@ function SectionHeading({
           <Icon className="size-4" />
           {eyebrow}
         </p>
-        <h2 className="mt-1 text-2xl">{title}</h2>
+        <h2 id={headingId} className="mt-1 text-2xl">
+          {title}
+        </h2>
       </div>
       <span className="text-sm text-ink/55">
         {count} record{count === 1 ? "" : "s"}

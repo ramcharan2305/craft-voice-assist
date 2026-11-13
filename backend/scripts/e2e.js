@@ -16,6 +16,7 @@ const supabase = createClient(
 const results = [];
 let productId;
 let enquiryId;
+let orderId;
 let buyerId;
 
 function check(name, condition, detail = "") {
@@ -138,34 +139,16 @@ async function main() {
   });
   productId = created.payload?.id;
   check(
-    "merchant submission is persisted pending moderation",
-    created.status === 201 && created.payload?.review_status === "pending",
+    "merchant listing is immediately available without moderation",
+    created.status === 201 && created.payload?.review_status === "approved",
     created.payload?.name,
-  );
-
-  const hiddenListing = await call(`/products/catalog?q=${encodeURIComponent(marker)}`, {
-    token: buyer.access_token,
-  });
-  check(
-    "pending listing is hidden from buyer catalogue",
-    hiddenListing.status === 200 && hiddenListing.payload.length === 0,
-  );
-
-  const approved = await call(`/admin/products/${productId}/review`, {
-    method: "PUT",
-    token: admin.access_token,
-    body: { action: "approve" },
-  });
-  check(
-    "admin approval is saved",
-    approved.status === 200 && approved.payload?.review_status === "approved",
   );
 
   const catalog = await call(`/products/catalog?q=${encodeURIComponent(marker)}`, {
     token: buyer.access_token,
   });
   check(
-    "approved product appears in buyer catalogue",
+    "newly listed product appears in buyer catalogue immediately",
     catalog.status === 200 && catalog.payload.some((row) => row.id === productId),
   );
 
@@ -188,21 +171,67 @@ async function main() {
     buyerImageAnalysis.status === 403 && buyerImageAnalysis.payload?.code === "ROLE_FORBIDDEN",
   );
 
-  const asked = await call("/buyer/requests", {
+  const purchased = await call("/buyer/purchases", {
     method: "POST",
     token: buyer.access_token,
     body: {
       product_id: productId,
       request_type: "purchase",
       quantity: 1,
-      message: "E2E temporary request",
+    },
+  });
+  orderId = purchased.payload?.id;
+  check(
+    "buyer purchase is recorded as a completed order and sale",
+    purchased.status === 201 &&
+      purchased.payload?.product_id === productId &&
+      purchased.payload?.status === "completed" &&
+      purchased.payload?.amount === 425,
+  );
+  const [merchantOrders, merchantDashboard, buyerPurchases, purchaseEnquiries, remainingStock] =
+    await Promise.all([
+      call("/orders", { token: merchant.access_token }),
+      call("/dashboard", { token: merchant.access_token }),
+      call("/buyer/requests", { token: buyer.access_token }),
+      call("/enquiries", { token: merchant.access_token }),
+      call(`/products/catalog?q=${encodeURIComponent(marker)}`, { token: buyer.access_token }),
+    ]);
+  check(
+    "direct purchase updates merchant order and sales totals",
+    merchantOrders.status === 200 &&
+      merchantOrders.payload.some((row) => row.id === orderId) &&
+      merchantDashboard.status === 200 &&
+      merchantDashboard.payload.totalSales >= 425,
+  );
+  check(
+    "purchase is visible to the buyer but is not sent as an enquiry",
+    buyerPurchases.status === 200 &&
+      buyerPurchases.payload.some((row) => row.id === orderId && row.status === "completed") &&
+      purchaseEnquiries.status === 200 &&
+      !purchaseEnquiries.payload.some((row) => row.product_id === productId),
+  );
+  check(
+    "purchase reduces available product stock",
+    remainingStock.status === 200 &&
+      remainingStock.payload.find((row) => row.id === productId)?.quantity === 1,
+  );
+
+  const asked = await call("/buyer/requests", {
+    method: "POST",
+    token: buyer.access_token,
+    body: {
+      product_id: productId,
+      request_type: "question",
+      quantity: 1,
+      message: "E2E temporary question",
     },
   });
   enquiryId = asked.payload?.id;
   check(
-    "buyer request is stored against the product",
+    "buyer questions remain enquiries",
     asked.status === 201 &&
       asked.payload?.product_id === productId &&
+      asked.payload?.request_type === "question" &&
       asked.payload?.status === "new",
   );
 
@@ -236,7 +265,7 @@ async function main() {
       buyerRequests.payload.find((row) => row.id === enquiryId)?.status === "responded",
   );
   check(
-    "artisan sees the incoming enquiry",
+    "artisan sees the incoming question enquiry",
     artisanRequests.status === 200 && artisanRequests.payload.some((row) => row.id === enquiryId),
   );
   check(
@@ -277,6 +306,13 @@ try {
     if (error) {
       console.error("Could not clean up the temporary enquiry:", error.message);
       process.exitCode = 1;
+    }
+    if (orderId) {
+      const { error } = await supabase.from("orders").delete().eq("id", orderId);
+      if (error) {
+        console.error("Could not clean up the temporary order:", error.message);
+        process.exitCode = 1;
+      }
     }
   }
   if (productId) {

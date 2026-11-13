@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { MicButton } from "@/components/MicButton";
 import { ProductCard } from "@/components/ProductCard";
+import { RecommendedOpportunities } from "@/components/RecommendedOpportunities";
 import { LANGUAGES, rupees } from "@/lib/mock-data";
 import { useStore } from "@/lib/store";
 import { uiText } from "@/lib/ui-text";
@@ -161,6 +162,8 @@ function HomePage() {
           </div>
         )}
       </section>
+
+      <RecommendedOpportunities />
     </AppShell>
   );
 }

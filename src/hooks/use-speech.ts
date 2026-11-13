@@ -9,13 +9,15 @@ function getVoiceLanguage(language: string): VoiceLanguage {
 }
 
 function microphoneError(error: unknown) {
-  if (error instanceof DOMException && error.name === "NotAllowedError") {
+  const errorName =
+    error instanceof DOMException || error instanceof Error ? error.name : undefined;
+  if (errorName === "NotAllowedError" || errorName === "PermissionDeniedError") {
     return "Microphone access was denied. Allow microphone access in your browser settings, then try again.";
   }
-  if (error instanceof DOMException && error.name === "NotFoundError") {
+  if (errorName === "NotFoundError") {
     return "No microphone was found. Connect a microphone or type your request instead.";
   }
-  if (error instanceof DOMException && error.name === "NotReadableError") {
+  if (errorName === "NotReadableError") {
     return "The microphone is busy in another app. Close that app and try again.";
   }
   return error instanceof Error

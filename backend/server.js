@@ -15,6 +15,9 @@ import orderRoutes from "./routes/orders.js";
 import productRoutes from "./routes/products.js";
 import schemeRoutes from "./routes/schemes.js";
 import trainingRoutes from "./routes/training.js";
+import opportunityRoutes from "./routes/opportunities.js";
+import { supabaseConfigured, requireSupabase } from "./db.js";
+import { scheduleOpportunityCrawl } from "./services/opportunities.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 5000);
@@ -49,6 +52,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/schemes", schemeRoutes);
 app.use("/api/training", trainingRoutes);
+app.use("/api/opportunities", opportunityRoutes);
 app.use("/api/market", marketRoutes);
 app.use("/api/market-insights", marketRoutes);
 app.use("/api/ai", aiRoutes);
@@ -65,4 +69,5 @@ app.use((error, _req, res, _next) => {
 
 app.listen(port, () => {
   console.log(`H-Connect backend listening on http://localhost:${port}`);
+  if (supabaseConfigured) scheduleOpportunityCrawl(requireSupabase);
 });

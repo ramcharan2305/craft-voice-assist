@@ -191,6 +191,8 @@
 
   html {
     -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
   }
 
   body {
@@ -198,6 +200,17 @@
     color: var(--color-ink);
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    min-width: 320px;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+    height: auto;
+    display: block;
   }
 
   h1,

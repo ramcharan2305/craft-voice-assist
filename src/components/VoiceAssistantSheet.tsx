@@ -114,6 +114,14 @@ export function VoiceAssistantSheet() {
     }
   }, [assistantOpen, phase, speech.transcribing]);
 
+  useEffect(() => {
+    if (!assistantOpen || !speech.error || (phase !== "listening" && phase !== "transcribing")) {
+      return;
+    }
+    setFailure(speech.error);
+    setPhase("failed");
+  }, [assistantOpen, phase, speech.error]);
+
   const send = useCallback(
     async (text: string) => {
       const input = text.trim();
@@ -123,6 +131,24 @@ export function VoiceAssistantSheet() {
       setPhase("working");
       setFailure(null);
       setTranslationWarning(null);
+
+      const quickAcknowledgement = (() => {
+        const normalized = input.toLowerCase();
+        if (normalized.includes("show my products") || normalized.includes("show products")) {
+          return "Showing your products.";
+        }
+        if (normalized.includes("show my orders") || normalized.includes("show my sales")) {
+          return "Showing your orders.";
+        }
+        if (normalized.includes("find buyers") || normalized.includes("buyer enquiries")) {
+          return "Checking your buyer activity.";
+        }
+        return null;
+      })();
+      if (quickAcknowledgement) {
+        setReply(quickAcknowledgement);
+        void speech.speak(quickAcknowledgement, language === "te" ? "te" : "en");
+      }
 
       try {
         const imageContext = draft.description
@@ -532,7 +558,7 @@ export function VoiceAssistantSheet() {
         ) : null}
 
         {phase === "failed" ? (
-          <div className="mt-4">
+          <div className="mt-4" role="alert">
             <ErrorNotice
               message={failure ?? "Something went wrong. Try again."}
               actionLabel="Try again"

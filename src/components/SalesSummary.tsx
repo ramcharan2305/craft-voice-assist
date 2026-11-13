@@ -15,8 +15,8 @@ export function SalesSummary({ stats }: { stats: Stat[] }) {
       <section className="glass p-5">
         <h2 className="text-lg">Monthly sales breakdown</h2>
         <p className="mt-3 text-sm text-ink/60">
-          Monthly totals and payment collection are not tracked. The values above come from
-          completed or shipped order records and are not payment-verified.
+          Monthly totals are not tracked. The values above include verified payments and shipped or
+          completed order records.
         </p>
       </section>
     </div>

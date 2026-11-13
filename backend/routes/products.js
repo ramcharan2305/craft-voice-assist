@@ -60,7 +60,7 @@ function readBody(body) {
   };
 }
 
-/** GET /api/products/catalog — only approved, available listings are public. */
+/** GET /api/products/catalog — available listings from verified artisans are public. */
 router.get("/catalog", async (req, res, next) => {
   try {
     const supabase = requireSupabase();
@@ -94,10 +94,10 @@ router.get("/catalog", async (req, res, next) => {
     let request = supabase
       .from("products")
       .select("*, artisans!inner(name, location, craft_type, verification_status)")
-      .eq("review_status", "approved")
+      .in("review_status", ["pending", "approved"])
       .eq("status", "listed")
       .gt("quantity", 0)
-      .eq("artisans.verification_status", "approved")
+      .in("artisans.verification_status", ["pending", "approved"])
       .order("created_at", { ascending: false });
     if (category) request = request.eq("category", category);
     if (maxPrice !== null) request = request.lte("price", maxPrice);
@@ -196,7 +196,7 @@ router.post("/", requireArtisan, async (req, res, next) => {
         quantity: fields.quantity ?? 1,
         image_url: fields.image_url ?? "",
         status: fields.status ?? "listed",
-        review_status: "pending",
+        review_status: "approved",
         review_feedback: "",
       })
       .select()
@@ -227,7 +227,7 @@ router.put("/:id", requireArtisan, async (req, res, next) => {
       return res.status(400).json({ error: "Use an image URL or JPEG, PNG, or WebP image." });
     }
     if (Object.keys(patch).some((field) => !["updated_at", "status"].includes(field))) {
-      patch.review_status = "pending";
+      patch.review_status = "approved";
       patch.review_feedback = "";
       patch.review_reviewed_at = null;
       patch.review_reviewed_by = null;

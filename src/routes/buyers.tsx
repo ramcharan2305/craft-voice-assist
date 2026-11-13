@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { enquiryApi } from "@/api/enquiryApi";
-import type { BuyerRequest, BuyerRequestStatus } from "@/api/buyerApi";
+import { enquiryApi, type BuyerEnquiry } from "@/api/enquiryApi";
+import type { BuyerRequestStatus } from "@/api/buyerApi";
 import { AppShell } from "@/components/AppShell";
 import { ResourceView } from "@/components/ResourceView";
 import { useResource } from "@/hooks/use-resource";
@@ -32,11 +32,10 @@ const STATUS_LABELS: Record<BuyerRequestStatus, string> = {
   responded: "Responded",
   closed: "Closed",
 };
-
 function BuyersPage() {
   const { say } = useStore();
   const [refreshKey, setRefreshKey] = useState(0);
-  const resource = useResource<BuyerRequest[]>(() => enquiryApi.getEnquiries(), [refreshKey]);
+  const resource = useResource<BuyerEnquiry[]>(() => enquiryApi.getEnquiries(), [refreshKey]);
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -44,7 +43,7 @@ function BuyersPage() {
     if (resource.status === "ready") setFailure(null);
   }, [resource.status]);
 
-  const updateStatus = async (item: BuyerRequest, status: Exclude<BuyerRequestStatus, "new">) => {
+  const updateStatus = async (item: BuyerEnquiry, status: Exclude<BuyerRequestStatus, "new">) => {
     setBusy(item.id);
     setFailure(null);
     try {
@@ -62,7 +61,8 @@ function BuyersPage() {
     <AppShell>
       <h1 className="text-3xl">Buyer enquiries</h1>
       <p className="mt-2 text-base text-ink/60">
-        Requests about your approved products and custom services appear here.
+        Buyer questions and service requests about your listed products appear here. Purchases are
+        recorded as orders and sales.
       </p>
       {failure ? (
         <p role="alert" className="mt-4 text-sm text-destructive">
@@ -74,7 +74,7 @@ function BuyersPage() {
           resource={resource}
           isEmpty={(items) => items.length === 0}
           emptyTitle="No enquiries yet"
-          emptyDetail="Buyer questions, purchase requests, and service enquiries will appear here."
+          emptyDetail="Buyer questions and service enquiries will appear here. Direct purchases appear on the Orders page."
         >
           {(items) => (
             <div className="space-y-3">

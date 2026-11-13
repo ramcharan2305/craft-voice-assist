@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 
-import { calculateCostBasedPrice, parseCommand } from "../services/aiService.js";
+import {
+  calculateCostBasedPrice,
+  isDirectListingCommand,
+  parseCommand,
+} from "../services/aiService.js";
 import { synthesizeSpeech, transcribeAudio, translateText } from "../services/sarvamService.js";
 
 const originalFetch = globalThis.fetch;
@@ -35,6 +39,32 @@ test("routes natural English variations to artisan features", async () => {
     const { result } = await parseCommand(text);
     assert.equal(result.intent, expected, text);
   }
+});
+
+test("routes English and Telugu saree-selling phrases to listing without an LLM call", async () => {
+  let llmCalls = 0;
+  process.env.LLM_API_KEY = "test-key";
+  globalThis.fetch = async () => {
+    llmCalls += 1;
+    return Response.json({ error: "rate limited" }, { status: 429 });
+  };
+
+  for (const phrase of [
+    "Sell this saree",
+    "Sell the saree",
+    "na saree ni pampu",
+    "నా చీరను పంపు",
+  ]) {
+    assert.equal(isDirectListingCommand(phrase), true, phrase);
+    const parsed = await parseCommand(phrase);
+    assert.equal(parsed.source, "local", phrase);
+    assert.equal(parsed.result.intent, "CREATE_PRODUCT", phrase);
+    assert.equal(parsed.result.product.name, "Saree", phrase);
+    assert.equal(parsed.result.product.category, "Saree", phrase);
+  }
+
+  assert.equal(isDirectListingCommand("Show my products"), false);
+  assert.equal(llmCalls, 0);
 });
 
 test("keeps product-list requests distinct from buyer catalogue searches", async () => {

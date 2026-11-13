@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { ArrowRight, Eye, EyeOff, ShieldCheck, ShoppingBag, Store } from "lucide-react";
 
 import type { AccountRole } from "@/api/authApi";
@@ -46,7 +46,7 @@ const ACCOUNT_ROLES: Array<{
 ];
 
 function LoginPage() {
-  const { status, user, login } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,10 +55,6 @@ function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [googleRole, setGoogleRole] = useState<AccountRole | null>(null);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (status === "authenticated" && user) void navigate({ to: roleHome(user.role) });
-  }, [status, user, navigate]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

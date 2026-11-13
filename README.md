@@ -9,17 +9,20 @@ using the existing React, Express, and Supabase stack.
 - Merchant workspace with product creation, editing, inventory, profile, and orders.
 - Telugu and Indian English voice commands and product dictation using Sarvam
   Saaras v4; recognized text remains visible and listings stay editable.
-- Product submissions require admin review before appearing in the buyer catalogue.
-- Admin artisan verification and product approve/reject/corrections actions,
+- Merchant product listings appear in the buyer catalogue immediately, without
+  product approval.
+- Admin artisan verification and optional product moderation actions,
   with feedback, database-backed review statistics, and the ability to remove
-  approved or demo listings.
-- Buyer search, category filters, price limits such as “under ₹2,000,” product
-  questions, purchase requests, service requests, and persistent request history.
+  visible or demo listings. Pending reviews do not block listing visibility;
+  rejected or changes-requested products and artisan profiles remain hidden.
+- Buyer search, category filters, price limits such as “under ₹2,000,” direct
+  purchases recorded as completed sales, product questions, service requests,
+  and persistent purchase/request history.
 - Voice/text assistant routes artisan product listings, sales orders, buyer
   enquiries, price questions, approved catalogue searches, and stored
   scheme/market records to existing project features.
-- No payment is collected. Web crawling is deferred; market and scheme pages are
-  not live event feeds.
+- No payment is collected. Official-source opportunity crawling runs daily and
+  can also be started by admins; crawled records are reviewed before recommendation.
 
 ## Demo accounts
 
@@ -69,13 +72,17 @@ are restricted by backend role checks.
    SUPABASE_PUBLISHABLE_KEY=<publishable-or-anon-key>
    SUPABASE_SECRET_KEY=<server-only-secret-or-service-role-key>
    SARVAM_API_KEY=<server-only-Sarvam-key>
+   LLM_API_KEY=<server-only-Groq-compatible-key>
+   LLM_BASE_URL=https://api.groq.com/openai/v1
+   LLM_MODEL=<supported-model-name>
    DATABASE_URL=postgresql://...
    ```
 
    `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are also accepted as
    legacy variable names. Never put the secret/service-role key in a frontend
-   environment file. `SARVAM_API_KEY` must also stay in `backend/.env`; never
-   add it to a `VITE_` variable or frontend environment file.
+   environment file. `SARVAM_API_KEY` and `LLM_API_KEY` must also stay in
+   `backend/.env`; never add them to a `VITE_` variable or frontend environment
+   file. `LLM_API_KEY` is required for structured opportunity extraction.
 
 3. Configure frontend Google sign-in by copying the root `.env.example` to `.env`:
 
@@ -101,8 +108,10 @@ are restricted by backend role checks.
    ```
 
    Alternatively, run `backend/sql/schema.sql` in Supabase SQL Editor. The
-   schema setup adds product review state, artisan verification state, and
-   persistent buyer enquiries to the existing tables.
+   schema setup adds product review state, artisan verification state,
+   persistent buyer enquiries, buyer-linked purchase orders, merchant matching
+   profile fields, and reviewed opportunity/crawl-history tables to the existing
+   database.
 
 5. Start the backend and frontend in separate terminals:
 
@@ -117,17 +126,39 @@ are restricted by backend role checks.
    Open <http://localhost:5173>. Vite proxies `/api` to the Express server at
    port 5000. Do not start a second backend on a port already in use.
 
+   Backend start commands use Node's system certificate store so Node's
+   HTTPS crawler can validate certificates installed in the operating system.
+   The backend expects a Node version that supports `--use-system-ca`.
+
 ## End-to-end workflow
 
 1. Sign in as the merchant, create a listing, dictate or type its description,
    check the editable fields, and submit it.
-2. The listing is saved as pending and is visible to the artisan but not buyers.
-3. Sign in as admin, review artisan/product submissions, and approve or provide
-   feedback for corrections/rejection.
-4. Sign in as buyer and find approved listings using search, category, or price.
-5. Send a purchase request or question. It goes directly to the merchant and
-   appears in buyer request history and the merchant enquiry screen. Admin is
-   only involved in artisan verification and product-listing review.
+2. The listing appears in the buyer catalogue immediately; no product approval
+   is required.
+3. Admin verifies artisan accounts. Product moderation remains available but
+   does not gate a merchant's new listing.
+4. Sign in as buyer and find listed products using search, category, or price.
+5. Buy a product to record a completed sale and update stock. Questions and
+   service requests go to the merchant enquiry screen. Payment is not collected.
+6. Merchants can complete location and business details in My profile to
+   personalize the “Recommended for You” section. Admins can trigger a crawl,
+   review source-backed opportunity records, and approve or remove them.
+
+The backend opportunity crawler discovers candidate pages from a trusted list of
+government, handloom, skills, textile and trade sources, using internal links
+and available sitemaps. It obeys each source's `robots.txt`, skips sources that
+refuse a readable policy or disallow AI input, limits requests to the source's
+official hosts, and extracts structured scheme, training and market-linkage
+details using the configured backend AI integration. Missing details remain
+blank; crawled records retain their original source URL and crawl timestamps
+and require admin review before they appear in recommendations. Admins can
+trigger a crawl manually; scheduled runs occur daily. Re-run
+`npm run db:setup` after updating to apply the additive opportunity schema.
+Configured sources include handlooms.gov.in, myhandlooms.gov.in, india.gov.in,
+nabard.org, skillindiadigital.gov.in, nsdcindia.org, nift.ac.in,
+indiatradefair.com, texprocil.org and epch.in. A source may be skipped when its
+robots policy disallows crawling/AI processing or cannot be read safely.
 
 The assistant understands natural-language requests in Telugu and English
 (India), including showing the artisan's products, opening the product listing
@@ -150,8 +181,9 @@ home and products screens. The assistant shows Telugu example commands when
 Telugu is selected.
 
 Google onboarding stores the selected buyer/merchant role in server-controlled
-Supabase app metadata. New merchant accounts receive a pending artisan profile
-and must be verified before their products appear in the buyer catalogue.
+Supabase app metadata. New merchant accounts receive a pending artisan profile.
+Their listed products appear in the buyer catalogue while the profile or listing
+is pending review; rejected profiles and listings remain hidden.
 Google users who already have an assigned role keep that role when signing in.
 Admin access is not available through public Google onboarding; the existing
 admin account remains managed separately.
@@ -165,7 +197,7 @@ admin account remains managed separately.
 | `SUPABASE_PUBLISHABLE_KEY`      | Auth sign-in key; legacy `SUPABASE_ANON_KEY` is accepted           |
 | `SUPABASE_SECRET_KEY`           | Server-only secret; legacy `SUPABASE_SERVICE_ROLE_KEY` is accepted |
 | `DATABASE_URL`                  | Supabase Postgres connection used by `npm run db:setup`            |
-| `LLM_API_KEY`                   | Optional server-side key for extra AI parsing and image analysis   |
+| `LLM_API_KEY`                   | Server-only key for AI parsing, opportunity extraction, and images  |
 | `SARVAM_API_KEY`                | Server-only Sarvam key for speech, translation, and text-to-speech |
 | `LLM_BASE_URL`                  | Optional OpenAI-compatible API base URL                            |
 | `LLM_MODEL`                     | Optional model identifier                                          |

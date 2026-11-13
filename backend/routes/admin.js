@@ -3,6 +3,7 @@ import { Router } from "express";
 import { requireSupabase } from "../db.js";
 import { requireRole } from "../middleware/auth.js";
 import { toArtisan, toProduct } from "../services/mappers.js";
+import { isExpired, startOpportunityCrawl } from "../services/opportunities.js";
 
 const router = Router();
 router.use(requireRole("admin"));
@@ -140,6 +141,105 @@ router.delete("/products/:id", async (req, res, next) => {
       .maybeSingle();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: "That product was not found." });
+    return res.json({ success: true, id: data.id });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/opportunities/status", async (_req, res, next) => {
+  try {
+    const supabase = requireSupabase();
+    const { data, error } = await supabase
+      .from("opportunity_crawl_runs")
+      .select("*")
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return res.json(data);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/opportunities", async (_req, res, next) => {
+  try {
+    const supabase = requireSupabase();
+    const { data, error } = await supabase
+      .from("opportunities")
+      .select("*")
+      .eq("is_removed", false)
+      .order("last_checked_at", { ascending: false });
+    if (error) throw error;
+    return res.json(data);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/opportunities/crawl", async (_req, res, next) => {
+  try {
+    const run = await startOpportunityCrawl(requireSupabase());
+    return res.status(202).json(run);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.put("/opportunities/:id/review", async (req, res, next) => {
+  try {
+    const status = req.body?.status;
+    if (!["approved", "rejected"].includes(status)) {
+      return res.status(400).json({ error: "Choose approved or rejected." });
+    }
+    const supabase = requireSupabase();
+    const { data: current, error: lookupError } = await supabase
+      .from("opportunities")
+      .select("id, deadline, event_date, is_removed")
+      .eq("id", req.params.id)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!current || current.is_removed) {
+      return res.status(404).json({ error: "That opportunity was not found." });
+    }
+    const verifiedAt = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("opportunities")
+      .update({
+        review_status: status,
+        status:
+          status === "approved"
+            ? isExpired(current.deadline, current.event_date)
+              ? "expired"
+              : "active"
+            : "unverified",
+        last_verified_at: status === "approved" ? verifiedAt : null,
+        updated_at: verifiedAt,
+      })
+      .eq("id", req.params.id)
+      .eq("is_removed", false)
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "That opportunity was not found." });
+    return res.json(data);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete("/opportunities/:id", async (req, res, next) => {
+  try {
+    const supabase = requireSupabase();
+    const { data, error } = await supabase
+      .from("opportunities")
+      .update({ is_removed: true, review_status: "rejected", updated_at: new Date().toISOString() })
+      .eq("id", req.params.id)
+      .select("id")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "That opportunity was not found." });
     return res.json({ success: true, id: data.id });
   } catch (error) {
     return next(error);

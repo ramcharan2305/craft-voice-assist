@@ -6,10 +6,11 @@ import {
   analyzeProductImage,
   answerQuestion,
   calculateCostBasedPrice,
+  isDirectListingCommand,
   parseCommand,
 } from "../services/aiService.js";
 import { synthesizeSpeech, transcribeAudio, translateText } from "../services/sarvamService.js";
-import { toEnquiry, toOrder, toProduct } from "../services/mappers.js";
+import { isRecordedSale, toEnquiry, toOrder, toProduct } from "../services/mappers.js";
 import {
   REFERENCE_SCHEMES,
   REFERENCE_TRAINING,
@@ -190,23 +191,27 @@ async function handleCreateProduct(req, res, parsed, pending) {
     });
   }
 
-  if (merged.price === null || merged.price === undefined) {
+  if (
+    merged.price === null ||
+    merged.price === undefined ||
+    merged.quantity === null ||
+    merged.quantity === undefined
+  ) {
     return res.json({
       intent: "CREATE_PRODUCT",
-      needsInput: true,
-      missingField: "price",
-      question: `How much do you want to sell your ${merged.name} for?`,
-      pending: { intent: "CREATE_PRODUCT", product: merged, missingField: "price" },
-    });
-  }
-
-  if (merged.quantity === null || merged.quantity === undefined) {
-    return res.json({
-      intent: "CREATE_PRODUCT",
-      needsInput: true,
-      missingField: "quantity",
-      question: `How many ${merged.name} are available?`,
-      pending: { intent: "CREATE_PRODUCT", product: merged, missingField: "quantity" },
+      message: `I’ve started your ${merged.name} listing. Add a photo and fill in the remaining details.`,
+      speak: `I’m opening the listing page. Add a photo of your ${merged.name}, then enter its price and quantity.`,
+      navigate: "/list",
+      draft: {
+        name: merged.name,
+        description: merged.description ?? "",
+        category: merged.category ?? "",
+        craft: merged.category ?? "",
+        material: merged.material ?? "",
+        color: merged.color ?? "",
+        price: merged.price ?? null,
+        quantity: merged.quantity ?? 1,
+      },
     });
   }
 
@@ -261,7 +266,7 @@ router.post("/command", requireArtisan, async (req, res, next) => {
     }
 
     const commandText =
-      language === "te" && /[\u0c00-\u0c7f]/u.test(text)
+      language === "te" && /[\u0c00-\u0c7f]/u.test(text) && !isDirectListingCommand(text)
         ? await translateText(text, "te", "en")
         : text;
     const { result, source } = await parseCommand(commandText, pending);
@@ -313,15 +318,13 @@ router.post("/command", requireArtisan, async (req, res, next) => {
           ...toOrder(row, row.products?.name),
           product_name: row.products?.name ?? "Product",
         }));
-        const completedSales = orders.filter(
-          (order) => order.status === "completed" || order.status === "shipped",
-        );
+        const completedSales = orders.filter(isRecordedSale);
         const value = completedSales.reduce((sum, order) => sum + order.amount, 0);
         const message = completedSales.length
-          ? `I found ${completedSales.length} completed or shipped order${completedSales.length === 1 ? "" : "s"} with a recorded total value of ${rupees(value)}. H-Connect does not record payment collection.`
+          ? `I found ${completedSales.length} sale${completedSales.length === 1 ? "" : "s"} with verified payment or shipped/completed status, totaling ${rupees(value)}.`
           : orders.length
-            ? `There are ${orders.length} recorded order${orders.length === 1 ? "" : "s"}, but none are completed or shipped yet. H-Connect does not record payment collection.`
-            : "No orders or sales are recorded yet. H-Connect does not record payment collection.";
+            ? `There are ${orders.length} recorded order${orders.length === 1 ? "" : "s"}, but none have verified payment or shipped/completed status yet.`
+            : "No orders or sales are recorded yet.";
         return res.json({
           intent: result.intent,
           message,
@@ -578,10 +581,10 @@ router.post("/command", requireArtisan, async (req, res, next) => {
         const { data, error } = await supabase
           .from("products")
           .select("*, artisans!inner(name, location, craft_type, verification_status)")
-          .eq("review_status", "approved")
+          .in("review_status", ["pending", "approved"])
           .eq("status", "listed")
           .gt("quantity", 0)
-          .eq("artisans.verification_status", "approved")
+          .in("artisans.verification_status", ["pending", "approved"])
           .order("created_at", { ascending: false })
           .limit(100);
         if (error) throw error;
